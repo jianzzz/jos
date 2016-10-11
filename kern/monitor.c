@@ -11,6 +11,9 @@
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
 
+
+#include <kern/pmap.h> //e.g. KADDR
+
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
 
@@ -26,6 +29,9 @@ static struct Command commands[] = {
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "setcolor", "Setcolor bg=[black|white|red|green|blue] ch=[black|white|red|green|blue]", mon_setcolor },
 	{ "backtrace", "Display the file name and line within that file of the stack frame's eip", mon_backtrace },
+	{ "showmappings", "Enter 'showmappings 0x3000 0x5000' to display the physical page mappings and corresponding permission bits that apply to the pages at virtual addresses 0x3000, 0x4000, and 0x5000.", mon_showmappings},
+	{ "setpermissions", "Enter 'setpermissions 0x3000 [0|1 :clear or set] [P|W|U]' to clear or set the permissions of page mapping at virtual addresses 0x3000.", mon_setpermissions},
+	{ "dumpcontents", "Enter 'dumpcontents [p|v :physical or virtual] 0x3000 10' to view 10 4-bytes contents from addr 0x3000.", mon_dumpcontents}
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -37,7 +43,7 @@ mon_help(int argc, char **argv, struct Trapframe *tf)
 	int i;
 
 	for (i = 0; i < NCOMMANDS; i++)
-		cprintf("%s - %s\n", commands[i].name, commands[i].desc);
+		cprintf("%d: %s - %s\n\n",i+1, commands[i].name, commands[i].desc);
 	return 0;
 }
 
@@ -105,7 +111,38 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 /***** 
 	setcolor command add by zhuangjian, 2016/07/17 
 *****/
-char *strstr(const char*s1,const char*s2)
+int jz_atoi(char* pstr) {
+    int intVal = 0;              // 返回值
+    int sign = 1;                // 符号, 正数为 1, 负数为 -1
+    if(pstr == 0) return 0;      // 判断指针是否为空 pstr == NULL
+    while(' '== *pstr) pstr++;   // 跳过前面的空格字符 ' ' 的 ascii 值 0x20
+    if('-'==*pstr) sign = -1;    // 判断正负号
+    if('-'==*pstr || '+'==*pstr) pstr++;// 如果是符号, 指针后移
+    while(*pstr >= '0' && *pstr <= '9') {// 逐字符转换成整数
+        // 转换说明
+        // ascii 的 '0' = 0x30 转换为int以后 - 0x30即为整型的0
+        // ascii 的 '1' = 0x31 转换为int以后 - 0x30即为整型的1
+        // ...
+        intVal = intVal * 10 + (((int)*pstr)-0x30);// 十进制即每位乘10, 结果累加保存
+        pstr++;// 指针后移
+    }
+    return intVal * sign;// 返回结果,int32 范围是: 2147483647 ~ -2147483648, 此处会进行溢出运算
+     
+}
+
+uint32_t jz_xtoi(char* pstr){
+	uint32_t res = 0;
+	pstr += 2;//0x...
+	while(*pstr){
+		if(*pstr >= 'a' && *pstr <= 'z') *pstr = *pstr - 'a' + 10 + '0';
+		else if(*pstr >= 'A' && *pstr <= 'Z') *pstr = *pstr - 'A' + 10 + '0';
+		res = res*16 + *pstr - '0';
+		++pstr;
+	}
+	return res;
+}
+
+char *jz_strstr(const char*s1,const char*s2)
 {
     int n;
     if(*s2)
@@ -132,11 +169,108 @@ mon_setcolor(int argc, char **argv, struct Trapframe *tf)
    	  	cprintf("Make sure the correct style: setcolor bg=[color] ch=[color]\n");
 		return 0;
 	}	 
-	setcolor(strstr(argv[1],"=")+1,strstr(argv[2],"=")+1); 
+	setcolor(jz_strstr(argv[1],"=")+1,jz_strstr(argv[2],"=")+1); 
 	return 0;
 }
 
+int
+mon_showmappings(int argc, char **argv, struct Trapframe *tf)
+{ 
+	if(argc != 3) {
+   	  	cprintf("Make sure the correct style: showmappings 0xbegin_addr 0xend_addr\n");
+		return 0;
+	}	 
+	//将地址字符串转换int，然后判断低12位是不是0
+	uint32_t begin = jz_xtoi(argv[1]), end = jz_xtoi(argv[2]);
+	if((begin & 0xfff) != 0 || (end & 0xfff) != 0 ){
+		cprintf("Make sure the addr's low 12 bits is zero\n");
+		return 0;
+	}
+	cprintf("Attention! You may test addr above UPAGES(0xef000000)\n");
+	cprintf("begin:%p, end:%p\n",begin,end);
+	pde_t *kpgdir = KADDR(rcr3()), *pde; 
+	pte_t *pte, *p;
+	uint32_t va;
+	for (va = begin; va <= end; va += PGSIZE) 
+	{ 
+		//or you can use pgdir_walk
+		pde = &kpgdir[PDX(va)];
+		if (*pde & PTE_P){ 
+			pte = (pte_t*) KADDR(PTE_ADDR(*pde)); 
+			if (*pte & PTE_P){ 
+				p = &pte[PTX(va)];
+				cprintf("va: %p, pa: %p, PTE_P: %x, PTE_W: %x, PTE_U: %x\n", 
+					va, *p, *p&PTE_P, *p&PTE_W, *p&PTE_U);			
+			} else {
+				cprintf("page mapping not exist: %x\n", va);
+			}
+		} else {
+			cprintf("page mapping not exist: %x\n", va);
+		}
+	}
+	return 0;
+}
 
+int 
+mon_setpermissions(int argc, char **argv, struct Trapframe *tf)
+{ 
+	if(argc != 4) {
+   	  	cprintf("Make sure the correct style: setpermissions 0xaddr [0|1 :clear or set] [P|W|U]\n");
+		return 0;
+	}	 
+	//将地址字符串转换int，然后判断低12位是不是0
+	uint32_t va = jz_xtoi(argv[1]);
+	if((va & 0xfff) != 0 ){
+		cprintf("Make sure the addr's low 12 bits is zero\n");
+		return 0;
+	}
+
+	pte_t *pte = pgdir_walk((pde_t *)KADDR(rcr3()),(void *)va,false);
+	if (pte && (*pte & PTE_P)){  
+		cprintf("before setpermissions %p\n",va);
+		cprintf("va: %p, pa: %p, PTE_P: %x, PTE_W: %x, PTE_U: %x\n", 
+			va, *pte, *pte&PTE_P, *pte&PTE_W, *pte&PTE_U);			
+		uint32_t perm = 0;
+	    if (argv[3][0] == 'P') perm = PTE_P;
+	    if (argv[3][0] == 'W') perm = PTE_W;
+	    if (argv[3][0] == 'U') perm = PTE_U;
+	    if (argv[2][0] == '0')  //clear
+	        *pte = *pte & ~perm;
+	    else    //set
+	        *pte = *pte | perm;
+	    cprintf("after setpermissions %p\n",va);
+		cprintf("va: %p, pa: %p, PTE_P: %x, PTE_W: %x, PTE_U: %x\n", 
+			va, *pte, *pte&PTE_P, *pte&PTE_W, *pte&PTE_U);		
+	} else {
+		cprintf("page mapping not exist: %x\n", va);
+	}
+	return 0;
+}
+ 
+int 
+mon_dumpcontents(int argc, char **argv, struct Trapframe *tf)
+{ 
+	if(argc != 4) {
+   	  	cprintf("Make sure the correct style: dumpcontents [p|v :physical or virtual] 0x3000 10\n");
+		return 0;
+	}	  
+	void** begin = NULL;
+	long length = strtol(argv[3],0,0);
+	uint32_t i; 
+ 	if (argv[1][0] == 'p') {
+		begin = (void**)(jz_xtoi(argv[2]) + KERNBASE);  
+	} else if (argv[1][0] == 'v') {  
+		begin = (void**)(jz_xtoi(argv[2])); 
+	}
+	if(begin > begin + length){
+		cprintf("out of memory.\n");
+		return 0;
+	}
+    for (i = 0; i < length; ++i){
+        cprintf("va at %x is %x\n", begin+i, begin[i]);
+    }
+	return 0; 
+}
 
 /***** Kernel monitor command interpreter *****/
 

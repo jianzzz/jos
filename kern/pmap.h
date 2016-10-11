@@ -22,7 +22,8 @@ extern pde_t *kern_pgdir;
  * and returns the corresponding physical address.  It panics if you pass it a
  * non-kernel virtual address.
  */
-#define PADDR(kva) _paddr(__FILE__, __LINE__, kva)
+ // 内核虚拟地址转化为物理地址
+#define PADDR(kva) _paddr(__FILE__, __LINE__, kva) // 在哪里并如何维护 __FILE__ 和 __LINE__?
 
 static inline physaddr_t
 _paddr(const char *file, int line, void *kva)
@@ -34,6 +35,7 @@ _paddr(const char *file, int line, void *kva)
 
 /* This macro takes a physical address and returns the corresponding kernel
  * virtual address.  It panics if you pass an invalid physical address. */
+ // 物理地址转化为内核虚拟地址
 #define KADDR(pa) _kaddr(__FILE__, __LINE__, pa)
 
 static inline void*
@@ -63,7 +65,7 @@ void	page_decref(struct PageInfo *pp);
 void	tlb_invalidate(pde_t *pgdir, void *va);
 
 static inline physaddr_t
-page2pa(struct PageInfo *pp)
+page2pa(struct PageInfo *pp) //求出当前页的物理地址
 {
 	return (pp - pages) << PGSHIFT;
 }
@@ -77,9 +79,9 @@ pa2page(physaddr_t pa)
 }
 
 static inline void*
-page2kva(struct PageInfo *pp)
+page2kva(struct PageInfo *pp) //根据页信息求物理地址，并转化为内核虚拟地址
 {
-	return KADDR(page2pa(pp));
+	return KADDR(page2pa(pp)); // see in the file
 }
 
 pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create);

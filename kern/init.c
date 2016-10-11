@@ -13,11 +13,22 @@
 void
 i386_init(void)
 {
+	//see kernel.ld !!!
 	extern char edata[], end[];
 
 	// Before doing anything else, complete the ELF loading process.
 	// Clear the uninitialized global data (BSS) section of our program.
 	// This ensures that all static/global variables start out zero.
+	
+	/* 
+		可以看到两个外部字符数组变量 edata 和 end，其中 edata 表示的是 bss 节在内
+	存中开始的位置，而 end 则是表示内核可执行程序在内存中结束的位置。由 2.1 节中对 ELF
+	文件的讲解我们可以知道 bss 节是文件在内存中的最后一部分，于是 edata 与 end 之间的部
+	分便是 bss 节的部分，我们又知道 bss 节的内容是未初始化的变量，而这些变量是默认为零
+	的，所以在一开始的时候程序要用 memset(edata, 0, end - edata)这句代码将这些变量都置为
+	零。
+	*/
+
 	memset(edata, 0, end - edata);
 
 	// Initialize the console.

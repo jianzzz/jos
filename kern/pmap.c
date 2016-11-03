@@ -195,9 +195,7 @@ mem_init(void)
 	//将pages所在的物理地址（4K对齐）起的4M空间映射到UPAGES（0xef000000）起的4M空间
 
 	// PTE_W 没有置位时，默认为可读。置位时，则为可读可写。
-	// PTE_U 没有置位时，默认为内核。置位时，则为内核/用户。
-
-	//todo: pages itself -- kernel RW, user NONE  How????????????????????????????????????????????
+	// PTE_U 没有置位时，默认为内核。置位时，则为内核/用户。 
 	boot_map_region(kern_pgdir,UPAGES,PTSIZE,PADDR(pages),PTE_U | PTE_P);
 	// by jianzzz, set 4MB page .......................
 	//boot_map_region_4m(kern_pgdir,UPAGES,PTSIZE,PADDR(pages),PTE_U | PTE_P);

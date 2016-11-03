@@ -93,8 +93,8 @@ boot_alloc(uint32_t n)
 	// the first virtual address that the linker did *not* assign
 	// to any kernel code or global variables.
 	if (!nextfree) {
-		//外部字符数组变量 edata 和 end，其中 edata 表示的是 bss 节在内
-		//存中开始的位置，而 end 则是表示内核可执行程序在内存中结束的位置。
+		//外部字符数组变量 edata 和 end，其中 edata 表示的是 bss 节起始位置（虚拟地址），
+		//而 end 则是表示内核可执行程序结束位置（虚拟地址）。
 		extern char end[];
 		nextfree = ROUNDUP((char *) end, PGSIZE);
 	}
@@ -197,7 +197,7 @@ mem_init(void)
 	// PTE_W 没有置位时，默认为可读。置位时，则为可读可写。
 	// PTE_U 没有置位时，默认为内核。置位时，则为内核/用户。
 
-	//todo: pages itself -- kernel RW, user NONE  ????????????????????????????????????????????
+	//todo: pages itself -- kernel RW, user NONE  How????????????????????????????????????????????
 	boot_map_region(kern_pgdir,UPAGES,PTSIZE,PADDR(pages),PTE_U | PTE_P);
 	// by jianzzz, set 4MB page .......................
 	//boot_map_region_4m(kern_pgdir,UPAGES,PTSIZE,PADDR(pages),PTE_U | PTE_P);

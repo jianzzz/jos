@@ -15,6 +15,9 @@
 
 #include <kern/pmap.h> //e.g. KADDR
 
+
+#include <kern/pmap.h> //e.g. KADDR
+
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
 

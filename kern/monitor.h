@@ -16,4 +16,13 @@ int mon_help(int argc, char **argv, struct Trapframe *tf);
 int mon_kerninfo(int argc, char **argv, struct Trapframe *tf);
 int mon_backtrace(int argc, char **argv, struct Trapframe *tf);
 
+/***** 
+	setcolor command add by zhuangjian, 2016/07/17 
+*****/
+int mon_setcolor(int argc, char **argv, struct Trapframe *tf);
+int mon_showmappings(int argc, char **argv, struct Trapframe *tf);
+int mon_setpermissions(int argc, char **argv, struct Trapframe *tf);
+int mon_dumpcontents(int argc, char **argv, struct Trapframe *tf);
+
+
 #endif	// !JOS_KERN_MONITOR_H

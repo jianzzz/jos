@@ -116,17 +116,14 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
-	struct Env* p = env_free_list = envs; 
-	envs[0].env_id = 0;
-	int i;
-	for (i = 1; i < NENV; ++i)
-	{
-		envs[i].env_id = 0;
+	env_free_list = NULL;  
+    int i;  
+    for( i = NENV -1; i>=0; i--){  
 		envs[i].env_status = ENV_FREE;
-		p->env_link = &envs[i];
-		p = p->env_link;
-	}
-	p->env_link = NULL;
+        envs[i].env_id = 0;  
+        envs[i].env_link = env_free_list;  
+        env_free_list = &envs[i];  
+    }  
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -252,8 +249,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	// to prevent the register values
 	// of a prior environment inhabiting this Env structure
 	// from "leaking" into our new environment.
-	memset(&e->env_tf, 0, sizeof(e->env_tf));
-
+	memset(&e->env_tf, 0, sizeof(e->env_tf)); //env_tf是Trapframe结构体，不是Trapframe结构体指针!
+ 
 	// Set up appropriate initial values for the segment registers.
 	// GD_UD is the user data segment selector in the GDT, and
 	// GD_UT is the user text segment selector (see inc/memlayout.h).
@@ -273,7 +270,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	env_free_list = e->env_link;
 	*newenv_store = e;
 
-	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
+	cprintf("in env_alloc, curenv->env_id is [%08x], new env->env_id is %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 	return 0;
 }
 
@@ -295,21 +292,21 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
 
-	//but I round va up
-	uint32_t va_val = *(uint32_t*)va;
-	uint32_t new_va = va_val + len;
-	if(new_va >= KERNBASE){ 
-    	return;
+	if(ROUNDUP((pte_t)va + len, PGSIZE) >= KERNBASE){ 
+    	panic("region_alloc panic, out of memory1");
 	}
-  	if(new_va < va_val){
-    	return;
-  	}
-  	uint32_t a = ROUNDUP(va_val,PGSIZE);
-  	//new_va <= env's memory range, 下次将作为旧的起始地址传入
-  	for(; a < new_va; a += PGSIZE){
-	    //todo
-  	}
-  	*(uint32_t*)va = new_va;
+	int npages = (ROUNDUP((pte_t)va + len, PGSIZE) - ROUNDDOWN((pte_t)va, PGSIZE)) / PGSIZE;  
+	struct PageInfo *p = NULL; 
+	int i=0;
+  	for(; i<npages; i++){
+		if (!(p = page_alloc(ALLOC_ZERO))){
+			 panic("region_alloc panic, out of memory2");
+		}
+		//map, use page_insert
+		if(page_insert(e->env_pgdir,p,(void*)((pte_t)va+i*PGSIZE),PTE_U|PTE_W)!=0){
+			panic("region_alloc panic, out of memory3");
+		}
+  	} 
 }
 
 //
@@ -369,29 +366,30 @@ load_icode(struct Env *e, uint8_t *binary)
 	struct Elf *elf = (struct Elf *)binary;
 	if (elf->e_magic != ELF_MAGIC)
 		panic("load_icode"); 
-	struct Proghdr *ph = (struct Proghdr *)(binary+elf->e_shoff);
+	struct Proghdr *ph = (struct Proghdr *)(binary+elf->e_phoff);
 
 	lcr3(PADDR(e->env_pgdir));
 
 	int i;
-	uint32_t va = 0;
 	for (i = 0; i < elf->e_phnum; ++i)
-	{
-		if(ph->p_type != ELF_PROG_LOAD) {
-			ph += 1;
+	{ 
+		if(ph->p_type != ELF_PROG_LOAD) {//不可载入段  
+			ph++;
 		 	continue;
 		}
-		//region_alloc根据起始地址va和长度计算结束地址，然后ROUNDUP(va)，根据结束地址分配了足够的页空间，
-		//va的值是 va+长度 即结束地址，而不是当前空间顶端。读取下一段的时候，
-		//新的分配长度应该是ph->p_va + 段内存长度 - 上次结束地址va，这样region_alloc可以再次计算新的结束地址。
-		region_alloc(e,&va,ph->p_va+ph->p_memsz-va);
+		//xv6分配用户空间是连续的, 给出起始地址va和结束地址，然后ROUNDUP(va)，根据结束地址分配了足够的页空间，
+		//va的值是结束地址，而不是当前空间顶端。读取下一段的时候，新的开始地址是上次结束地址, 新的结束地址是ph.vaddr + ph.memsz。 
+		//jos分配用户空间不是连续的,而是根据ph->p_va作为每次的开始地址，以p_memsz为长度进行页分配。
+		region_alloc(e,(void*)ph->p_va,ph->p_memsz);
 		//read into env's memory , need env's pgdir
 		memcpy((char*)ph->p_va,(char*)(binary + ph->p_offset),ph->p_filesz);
+		ph++;
 	}
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
+	/*
 	uint32_t stack_va_start = ROUNDUP(va,PGSIZE);
 	region_alloc(e,&va,va+PGSIZE-va);  
 	//map at USTACKTOP - PGSIZE, now get pa from va
@@ -403,9 +401,12 @@ load_icode(struct Env *e, uint8_t *binary)
 	pte = pgdir_walk(e->env_pgdir, (void *) USTACKTOP - PGSIZE, 1); //create
     if (pte == NULL) panic("load_icode panic, out of memory2");
     *pte = pa | flags | PTE_P;
+	*/
+	region_alloc(e,(void*)USTACKTOP - PGSIZE,PGSIZE);
 
-	//no need to set env's size???
+	//todo...binary的数据位于内核空间的哪个节？
 	e->env_tf.tf_eip = elf->e_entry;  // main 
+
 	lcr3(PADDR(kern_pgdir));
 }
 
@@ -543,7 +544,18 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-
+	if(!e) panic("env_run panic");
+	if(e->env_status == ENV_RUNNABLE){
+		if(curenv && curenv->env_status == ENV_RUNNING){
+			curenv->env_status = ENV_RUNNABLE;
+		}	
+		curenv = e;
+		e->env_status = ENV_RUNNING;
+		e->env_runs += 1;
+		lcr3(PADDR(e->env_pgdir)); 
+	
+		env_pop_tf(&(e->env_tf));//never return 
+	}
 	panic("env_run not yet implemented");
 }
 

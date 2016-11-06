@@ -242,6 +242,7 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+	//保留了pa<-->KERNBASE+pa之间的转换关系!!!!!! i.e. PADDR vs KADDR
 	boot_map_region(kern_pgdir, KERNBASE, 0xffffffff - KERNBASE + 1, 0, PTE_W | PTE_P);
 	// by jianzzz, set 4MB page .......................
 	//boot_map_region_4m(kern_pgdir, KERNBASE, 0xffffffff - KERNBASE + 1, 0, PTE_W | PTE_P);

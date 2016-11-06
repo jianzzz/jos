@@ -189,7 +189,9 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
-	e->env_pgdir = (pde_t *) page2kva(p);
+	//在没有具体的映射之前，物理地址都是直接加上KERNBASE作为虚拟地址的!!!
+	//内核空间的变量的虚拟地址也是如此
+	e->env_pgdir = (pde_t *) page2kva(p); //pa + KERNBASE !!!!!!
 	p->pp_ref = 1;
 	//use kern_pgdir as a template
 	/*
@@ -294,19 +296,20 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   (Watch out for corner-cases!)
 
 	//but I round va up
-	uint32_t new_va = *(uint32_t*)va + len;
+	uint32_t va_val = *(uint32_t*)va;
+	uint32_t new_va = va_val + len;
 	if(new_va >= KERNBASE){ 
     	return;
 	}
-  	if(new_va < va){
+  	if(new_va < va_val){
     	return;
   	}
-  	uint32_t a = ROUNDUP(va,PGSIZE);
+  	uint32_t a = ROUNDUP(va_val,PGSIZE);
   	//new_va <= env's memory range, 下次将作为旧的起始地址传入
   	for(; a < new_va; a += PGSIZE){
 	    //todo
   	}
-  	*va = new_va;
+  	*(uint32_t*)va = new_va;
 }
 
 //
@@ -367,6 +370,9 @@ load_icode(struct Env *e, uint8_t *binary)
 	if (elf->e_magic != ELF_MAGIC)
 		panic("load_icode"); 
 	struct Proghdr *ph = (struct Proghdr *)(binary+elf->e_shoff);
+
+	lcr3(PADDR(e->env_pgdir));
+
 	int i;
 	uint32_t va = 0;
 	for (i = 0; i < elf->e_phnum; ++i)
@@ -375,14 +381,32 @@ load_icode(struct Env *e, uint8_t *binary)
 			ph += 1;
 		 	continue;
 		}
-		region_alloc(e,&va,ph->va+ph->p_memsz-va);
-		//memcpy((char*)ph->p_va,(char*)(binary + ph->p_offset),ph->p_filesz);
-		//read into env's memory???
+		//region_alloc根据起始地址va和长度计算结束地址，然后ROUNDUP(va)，根据结束地址分配了足够的页空间，
+		//va的值是 va+长度 即结束地址，而不是当前空间顶端。读取下一段的时候，
+		//新的分配长度应该是ph->p_va + 段内存长度 - 上次结束地址va，这样region_alloc可以再次计算新的结束地址。
+		region_alloc(e,&va,ph->p_va+ph->p_memsz-va);
+		//read into env's memory , need env's pgdir
+		memcpy((char*)ph->p_va,(char*)(binary + ph->p_offset),ph->p_filesz);
 	}
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
+	uint32_t stack_va_start = ROUNDUP(va,PGSIZE);
+	region_alloc(e,&va,va+PGSIZE-va);  
+	//map at USTACKTOP - PGSIZE, now get pa from va
+	pte_t *pte = pgdir_walk(e->env_pgdir, (void *) stack_va_start, 0); //no create
+    if (pte == NULL) panic("load_icode panic, out of memory1");
+    uint32_t pa = PTE_ADDR(*pte);
+    uint32_t flags = PTE_FLAGS(*pte);
+    //now map 
+	pte = pgdir_walk(e->env_pgdir, (void *) USTACKTOP - PGSIZE, 1); //create
+    if (pte == NULL) panic("load_icode panic, out of memory2");
+    *pte = pa | flags | PTE_P;
+
+	//no need to set env's size???
+	e->env_tf.tf_eip = elf->e_entry;  // main 
+	lcr3(PADDR(kern_pgdir));
 }
 
 //

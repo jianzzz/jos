@@ -388,20 +388,7 @@ load_icode(struct Env *e, uint8_t *binary)
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
-	// LAB 3: Your code here.
-	/*
-	uint32_t stack_va_start = ROUNDUP(va,PGSIZE);
-	region_alloc(e,&va,va+PGSIZE-va);  
-	//map at USTACKTOP - PGSIZE, now get pa from va
-	pte_t *pte = pgdir_walk(e->env_pgdir, (void *) stack_va_start, 0); //no create
-    if (pte == NULL) panic("load_icode panic, out of memory1");
-    uint32_t pa = PTE_ADDR(*pte);
-    uint32_t flags = PTE_FLAGS(*pte);
-    //now map 
-	pte = pgdir_walk(e->env_pgdir, (void *) USTACKTOP - PGSIZE, 1); //create
-    if (pte == NULL) panic("load_icode panic, out of memory2");
-    *pte = pa | flags | PTE_P;
-	*/
+	// LAB 3: Your code here. 
 	region_alloc(e,(void*)USTACKTOP - PGSIZE,PGSIZE);
 
 	//todo...binary的数据位于内核空间的哪个节？

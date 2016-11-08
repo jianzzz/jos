@@ -20,7 +20,7 @@ static struct Trapframe *last_tf;
 /* Interrupt descriptor table.  (Must be built at run time because
  * shifted function addresses can't be represented in relocation records.)
  */
-struct Gatedesc idt[256] = { { 0 } };
+struct Gatedesc idt[256] = { { 0 } }; //see in inc/mmu.h
 struct Pseudodesc idt_pd = {
 	sizeof(idt) - 1, (uint32_t) idt
 };
@@ -59,12 +59,21 @@ static const char *trapname(int trapno)
 }
 
 
+/*
+ * add by jianzzz
+ */
+extern uint32_t entry_points[]; //see in trapentry.S
 void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	int i;
+	for (i = 0; i < 31; ++i)
+	{
+		SETGATE(idt[i],1,GD_KT,entry_points[i],0);//why GD_KT???
+	}
 
 	// Per-CPU setup 
 	trap_init_percpu();

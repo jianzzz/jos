@@ -62,6 +62,7 @@ static const char *trapname(int trapno)
 /*
  * add by jianzzz
  */
+//entry_points store handler-function's address
 extern uint32_t entry_points[]; //see in trapentry.S
 void
 trap_init(void)
@@ -72,7 +73,7 @@ trap_init(void)
 	int i;
 	for (i = 0; i < 31; ++i)
 	{
-		SETGATE(idt[i],1,GD_KT,entry_points[i],0);//why GD_KT???
+		SETGATE(idt[i],1,GD_KT,entry_points[i],0);//todo...why GD_KT???
 	}
 
 	// Per-CPU setup 

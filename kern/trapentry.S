@@ -20,13 +20,15 @@
  *   void NAME();
  * where NAME is the argument passed to TRAPHANDLER.
  */
- 
+ /*
+ 	todo...automatically pushes an error code, but how???
+ */
  #define TRAPHANDLER(name, num)						\
  	.globl name;		/* define global symbol for 'name' */	\
  	.type name, @function;	/* symbol type is function */		\
  	.align 2;		/* align function definition */		\
  	name:			/* function starts here */		\
- 	pushl $(num);							\
+ 	pushl $(num);							\  	
  	jmp _alltraps
 
 /* Use TRAPHANDLER_NOEC for traps where the CPU doesn't push an error code.
@@ -78,6 +80,11 @@ _alltraps:
   pushl %es 
   pushal
   //load GD_KD into %ds and %es
+  movw $(GD_KD), %ax
+  movw %ax, %ds
+  movw %ax, %es 
+  pushl %esp
+  call trap
 
 
 /*

@@ -28,7 +28,7 @@
  	.type name, @function;	/* symbol type is function */		\
  	.align 2;		/* align function definition */		\
  	name:			/* function starts here */		\
- 	pushl $(num);							\  	
+ 	pushl $(num);							\
  	jmp _alltraps
 
 /* Use TRAPHANDLER_NOEC for traps where the CPU doesn't push an error code.
@@ -49,14 +49,14 @@
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */  
-TRAPHANDLER(entry_point0,T_DIVIDE)
-TRAPHANDLER(entry_point1,T_DEBUG) 
-TRAPHANDLER(entry_point2,T_NMI)
-TRAPHANDLER(entry_point3,T_BRKPT)
-TRAPHANDLER(entry_point4,T_OFLOW)
-TRAPHANDLER(entry_point5,T_BOUND)
-TRAPHANDLER(entry_point6,T_ILLOP)
-TRAPHANDLER(entry_point7,T_DEVICE)
+TRAPHANDLER_NOEC(entry_point0,T_DIVIDE)
+TRAPHANDLER_NOEC(entry_point1,T_DEBUG) 
+TRAPHANDLER_NOEC(entry_point2,T_NMI)
+TRAPHANDLER_NOEC(entry_point3,T_BRKPT)
+TRAPHANDLER_NOEC(entry_point4,T_OFLOW)
+TRAPHANDLER_NOEC(entry_point5,T_BOUND)
+TRAPHANDLER_NOEC(entry_point6,T_ILLOP)
+TRAPHANDLER_NOEC(entry_point7,T_DEVICE)
 TRAPHANDLER(entry_point8,T_DBLFLT)
 # TRAPHANDLER(entry_point9,T_COPROC)
 TRAPHANDLER(entry_point10,T_TSS)
@@ -65,10 +65,7 @@ TRAPHANDLER(entry_point12,T_STACK)
 TRAPHANDLER(entry_point13,T_GPFLT)
 TRAPHANDLER(entry_point14,T_PGFLT)
 # TRAPHANDLER(entry_point15,T_RES)
-TRAPHANDLER(entry_point16,T_FPERR)
-TRAPHANDLER(entry_point17,T_ALIGN)
-TRAPHANDLER(entry_point18,T_MCHK)
-TRAPHANDLER(entry_point19,T_SIMDERR) 
+TRAPHANDLER_NOEC(entry_point16,T_FPERR) 
  
 /*
  * Lab 3: Your code here for _alltraps
@@ -111,10 +108,10 @@ entry_points:
   .long entry_point14
 #  .long entry_point15
   .long entry_point16
+  /*
   .long entry_point17
   .long entry_point18
   .long entry_point19
-  /*
   .long entry_point20
   .long entry_point21
   .long entry_point22

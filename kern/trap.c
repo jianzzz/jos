@@ -59,21 +59,24 @@ static const char *trapname(int trapno)
 }
 
 
-/*
- * add by jianzzz
- */
-//entry_points store handler-function's address
-extern uint32_t entry_points[]; //see in trapentry.S
 void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	/*
+	 * add by jianzzz
+	 */
+	//entry_points store handler-function's address
+	extern uint32_t entry_points[]; //see in trapentry.S
 	int i;
-	for (i = 0; i < 31; ++i)
+	for (i = 0; i < 16; ++i)
 	{
-		SETGATE(idt[i],1,GD_KT,entry_points[i],0);//todo...why GD_KT???
+		if (i==T_BRKPT)
+			SETGATE(idt[i], 1, GD_KT, entry_points[i], 3)
+		else if(i!=9 && i!=15)
+			SETGATE(idt[i],1,GD_KT,entry_points[i],0);//todo...why GD_KT???
 	}
 
 	// Per-CPU setup 
@@ -153,7 +156,11 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-
+	if (tf->tf_trapno == T_PGFLT) {
+		cprintf("PAGE FAULT\n");
+		page_fault_handler(tf);
+		return;
+	}
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -177,6 +184,7 @@ trap(struct Trapframe *tf)
 	assert(!(read_eflags() & FL_IF));
 
 	cprintf("Incoming TRAP frame at %p\n", tf);
+	cprintf("Incoming TRAP number %d\n", tf->tf_trapno);
 
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
@@ -214,7 +222,8 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
-
+	if ((tf->tf_cs&3) == 0)
+		panic("Kernel page fault!");
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
 

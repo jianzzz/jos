@@ -72,13 +72,12 @@ trap_init(void)
 	extern uint32_t entry_points[]; //see in trapentry.S
 	int i;
 	for (i = 0; i < 16; ++i)
-	{
+	{ 
 		if (i==T_BRKPT)
-			SETGATE(idt[i], 1, GD_KT, entry_points[i], 3)
+			SETGATE(idt[i], 0, GD_KT, entry_points[i], 3)
 		else if(i!=9 && i!=15)
-			SETGATE(idt[i],1,GD_KT,entry_points[i],0);//todo...why GD_KT???
-	}
-
+			SETGATE(idt[i],0,GD_KT,entry_points[i],0);//todo...why GD_KT???  
+	} 
 	// Per-CPU setup 
 	trap_init_percpu();
 }

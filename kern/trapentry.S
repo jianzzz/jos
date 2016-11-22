@@ -66,7 +66,7 @@ TRAPHANDLER(entry_point13,T_GPFLT)
 TRAPHANDLER(entry_point14,T_PGFLT)
 # TRAPHANDLER(entry_point15,T_RES)
 TRAPHANDLER_NOEC(entry_point16,T_FPERR) 
- 
+  
 /*
  * Lab 3: Your code here for _alltraps
  */
@@ -101,12 +101,14 @@ entry_points:
   .long entry_point7
   .long entry_point8
 #  .long entry_point9
+  .long 0   #attendion: instead we should fill the hole with 0, or it will cause entry_points array's wrong index
   .long entry_point10
   .long entry_point11
   .long entry_point12
   .long entry_point13
   .long entry_point14
 #  .long entry_point15
+  .long 0   #attendion: instead we should fill the hole with 0, or it will cause entry_points array's wrong index
   .long entry_point16
   /*
   .long entry_point17

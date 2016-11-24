@@ -19,10 +19,7 @@
  * during IDT setup).  You can declare the function with
  *   void NAME();
  * where NAME is the argument passed to TRAPHANDLER.
- */
- /*
- 	todo...automatically pushes an error code, but how???
- */
+ */ 
  #define TRAPHANDLER(name, num)						\
  	.globl name;		/* define global symbol for 'name' */	\
  	.type name, @function;	/* symbol type is function */		\

@@ -159,10 +159,7 @@ trap_dispatch(struct Trapframe *tf)
 		page_fault_handler(tf);
 		return;
 	}
-	if (tf->tf_trapno == T_BRKPT) { 
-		cprintf("%p/n",tf->tf_eflags);
-		tf->tf_eflags = tf->tf_eflags ;
-		cprintf("%p/n",tf->tf_eflags);
+	if (tf->tf_trapno == T_BRKPT) {  
 		monitor(tf);
 		return;
 	} 

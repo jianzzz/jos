@@ -35,7 +35,9 @@ static struct Command commands[] = {
 	{ "backtrace", "Display the file name and line within that file of the stack frame's eip", mon_backtrace },
 	{ "showmappings", "Enter 'showmappings 0x3000 0x5000' to display the physical page mappings and corresponding permission bits that apply to the pages at virtual addresses 0x3000, 0x4000, and 0x5000.", mon_showmappings},
 	{ "setpermissions", "Enter 'setpermissions 0x3000 [0|1 :clear or set] [P|W|U]' to clear or set the permissions of page mapping at virtual addresses 0x3000.", mon_setpermissions},
-	{ "dumpcontents", "Enter 'dumpcontents [p|v :physical or virtual] 0x3000 10' to view 10 4-bytes contents from addr 0x3000.", mon_dumpcontents}
+	{ "dumpcontents", "Enter 'dumpcontents [p|v :physical or virtual] 0x3000 10' to view 10 4-bytes contents from addr 0x3000.", mon_dumpcontents},
+	{ "continue", "Enter 'continue' so that you can 'continue' execution from the current location .", mon_continue},
+	{ "step", "Enter 'step' so that you can single-step one instruction at a time.", mon_step}
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -274,6 +276,31 @@ mon_dumpcontents(int argc, char **argv, struct Trapframe *tf)
         cprintf("va at %x is %x\n", begin+i, begin[i]);
     }
 	return 0; 
+}
+
+int mon_continue(int argc,char **argv,struct Trapframe *tf){ 
+	uint32_t eflags;
+	if(tf==NULL){ 
+		cprintf("No trapped environment\n");
+		return 0;
+	}
+	eflags=tf->tf_eflags;
+	eflags |= FL_RF;
+	eflags &= ~FL_TF; 
+	tf->tf_eflags=eflags; 
+	return -1;
+}
+
+int mon_step(int argc,char **argv,struct Trapframe *tf){ 
+	uint32_t eflags;
+	if(tf==NULL){ 
+		cprintf("No trapped environment\n");
+		return 0;
+	}
+	eflags=tf->tf_eflags;
+	eflags |= FL_TF; 
+	tf->tf_eflags=eflags; 
+	return -1;
 }
 
 /***** Kernel monitor command interpreter *****/

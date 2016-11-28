@@ -285,7 +285,7 @@ int mon_continue(int argc,char **argv,struct Trapframe *tf){
 		return 0;
 	}
 	eflags=tf->tf_eflags;
-	eflags |= FL_RF;
+	//eflags |= FL_RF;
 	eflags &= ~FL_TF; 
 	tf->tf_eflags=eflags; 
 	return -1;

@@ -78,6 +78,7 @@ trap_init(void)
 		else if(i!=9 && i!=15)
 			SETGATE(idt[i],0,GD_KT,entry_points[i],0);//todo...why GD_KT???  
 	} 
+	SETGATE(idt[T_SYSCALL],0,GD_KT,entry_points[T_SYSCALL],3); 
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -155,23 +156,39 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-	if (tf->tf_trapno == T_PGFLT) { 
+	uint32_t ret_code;
+	switch(tf->tf_trapno) {
+	case (T_PGFLT):
 		page_fault_handler(tf);
-		return;
-	}
-	if (tf->tf_trapno == T_BRKPT) {  
+		break;
+	case (T_BRKPT):
+		print_trapframe(tf);
 		monitor(tf);
-		return;
+		break;
+	case (T_DEBUG):
+		print_trapframe(tf);
+		monitor(tf);
+		break;
+	case (T_SYSCALL):
+		ret_code = syscall(
+			tf->tf_regs.reg_eax,
+			tf->tf_regs.reg_edx,
+			tf->tf_regs.reg_ecx,
+			tf->tf_regs.reg_ebx,
+			tf->tf_regs.reg_edi,
+			tf->tf_regs.reg_esi);
+		tf->tf_regs.reg_eax = ret_code;//attention
+		break;
+	default:
+		// Unexpected trap: The user process or the kernel has a bug.
+		print_trapframe(tf);
+		if (tf->tf_cs == GD_KT)
+			panic("unhandled trap in kernel");
+		else {
+			env_destroy(curenv);
+			return;
+		}
 	} 
-
-	// Unexpected trap: The user process or the kernel has a bug.
-	print_trapframe(tf);
-	if (tf->tf_cs == GD_KT)
-		panic("unhandled trap in kernel");
-	else {
-		env_destroy(curenv);
-		return;
-	}
 }
 
 void
@@ -188,6 +205,7 @@ trap(struct Trapframe *tf)
 
 	cprintf("Incoming TRAP frame at %p\n", tf);
 	cprintf("Incoming TRAP number %d\n", tf->tf_trapno);
+	cprintf("Incoming curenv->env_id %d\n", curenv->env_id);
 
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.

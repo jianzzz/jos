@@ -9,27 +9,18 @@ check_kern_pgdir() succeeded!
 check_page_installed_pgdir() succeeded!
 in env_alloc, curenv->env_id is [00000000], new env->env_id is 00001000
 Incoming TRAP frame at 0xefffffbc
-Incoming TRAP number 13
-TRAP frame at 0xf01a2000
-  edi  0x00000000
-  esi  0x00000000
-  ebp  0xeebfdfb0
-  oesp 0xefffffdc
-  ebx  0x00000000
-  edx  0x00800e60
-  ecx  0x00100000
-  eax  0x00000000
-  es   0x----0023
-  ds   0x----0023
-  trap 0x0000000d General Protection
-  err  0x00000182
-  eip  0x008000b0
-  cs   0x----001b
-  flag 0x00000096
-  esp  0xeebfdfa4
-  ss   0x----0023
+Incoming TRAP number 48
+Incoming curenv->env_id 4096
+Incoming TRAP frame at 0xefffffbc
+Incoming TRAP number 48
+Incoming curenv->env_id 4096
+hello, world
+Incoming TRAP frame at 0xefffffbc
+Incoming TRAP number 48
+Incoming curenv->env_id 4096
+[00001000] exiting gracefully
 [00001000] free env 00001000
 Destroyed the only environment - nothing more to do!
 Welcome to the JOS kernel monitor!
 Type 'help' for a list of commands.
-qemu: terminating on signal 15 from pid 10389
+qemu: terminating on signal 15 from pid 19322

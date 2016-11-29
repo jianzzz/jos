@@ -25,7 +25,7 @@ sys_cputs(const char *s, size_t len)
 	//see in kern/env.c : int	envid2env(envid_t envid, struct Env **env_store, bool checkperm);
 	//struct Env* e ;
 	//envid2env(sys_getenvid(),&e,1);
-	//user_mem_assert(curenv, s, len, PTE_U);//see in kern/pmap.c
+	user_mem_assert(curenv, s, len, PTE_U);//see in kern/pmap.c
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
 }

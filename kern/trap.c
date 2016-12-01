@@ -162,11 +162,11 @@ trap_dispatch(struct Trapframe *tf)
 		page_fault_handler(tf);
 		break;
 	case (T_BRKPT):
-		print_trapframe(tf);
+		//print_trapframe(tf);
 		monitor(tf);
 		break;
 	case (T_DEBUG):
-		print_trapframe(tf);
+		//print_trapframe(tf);
 		monitor(tf);
 		break;
 	case (T_SYSCALL):

@@ -300,6 +300,7 @@ int mon_step(int argc,char **argv,struct Trapframe *tf){
 	eflags=tf->tf_eflags;
 	eflags |= FL_TF; 
 	tf->tf_eflags=eflags; 
+	cprintf("test\n");
 	return -1;
 }
 

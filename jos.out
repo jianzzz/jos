@@ -21,4 +21,4 @@ user_mem_check va: f010000c, len: 64
 Destroyed the only environment - nothing more to do!
 Welcome to the JOS kernel monitor!
 Type 'help' for a list of commands.
-qemu: terminating on signal 15 from pid 12149
+qemu: terminating on signal 15 from pid 5268

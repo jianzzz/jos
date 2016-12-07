@@ -76,7 +76,7 @@ trap_init(void)
 		if (i==T_BRKPT)
 			SETGATE(idt[i], 0, GD_KT, entry_points[i], 3)
 		else if(i!=9 && i!=15)
-			SETGATE(idt[i],0,GD_KT,entry_points[i],0);//todo...why GD_KT???  
+			SETGATE(idt[i],0,GD_KT,entry_points[i],0);  
 	} 
 	SETGATE(idt[T_SYSCALL],0,GD_KT,entry_points[T_SYSCALL],3); 
 	// Per-CPU setup 

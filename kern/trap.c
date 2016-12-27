@@ -239,8 +239,8 @@ trap_dispatch(struct Trapframe *tf)
 		else {
 			env_destroy(curenv);
 			return;
-		}
-	}  
+		} 
+	}    
 }
 
 void

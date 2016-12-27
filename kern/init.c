@@ -69,9 +69,8 @@ i386_init(void)
 #if defined(TEST)
 	// Don't touch -- used by grading script!
 	ENV_CREATE(TEST, ENV_TYPE_USER);
-#else
-	// Touch all you want.
-<<<<<<< HEAD
+#else 
+	// Touch all you want.  
 	ENV_CREATE(user_primes, ENV_TYPE_USER);
 #endif // TEST*
 
@@ -108,7 +107,7 @@ boot_aps(void)
 		// Wait for the CPU to finish some basic setup in mp_main()
 		while(c->cpu_status != CPU_STARTED)
 			;
-	} 
+	}  
 }
 
 // Setup code for APs

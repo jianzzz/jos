@@ -26,19 +26,19 @@
 // To construct a linear address la from PDX(la), PTX(la), and PGOFF(la),
 // use PGADDR(PDX(la), PTX(la), PGOFF(la)).
 
-// page number field of address
+// page number field of address //根据线性地址求页码，页目录项与页表、页表项与页面之间的映射是按顺序固定的吗??????
 #define PGNUM(la)	(((uintptr_t) (la)) >> PTXSHIFT)
 
-// page directory index
+// page directory index //根据线性地址求页目录索引
 #define PDX(la)		((((uintptr_t) (la)) >> PDXSHIFT) & 0x3FF)
 
-// page table index
+// page table index //根据线性地址求页表索引
 #define PTX(la)		((((uintptr_t) (la)) >> PTXSHIFT) & 0x3FF)
 
-// offset in page
+// offset in page //根据线性地址求偏移
 #define PGOFF(la)	(((uintptr_t) (la)) & 0xFFF)
 
-// construct linear address from indexes and offset
+// construct linear address from indexes and offset //构造线性地址
 #define PGADDR(d, t, o)	((void*) ((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
 
 // Page directory and page table constants.
@@ -47,7 +47,7 @@
 
 #define PGSIZE		4096		// bytes mapped by a page
 #define PGSHIFT		12		// log2(PGSIZE)
-
+//一个页目录项映射的物理页内存大小
 #define PTSIZE		(PGSIZE*NPTENTRIES) // bytes mapped by a page directory entry
 #define PTSHIFT		22		// log2(PTSIZE)
 
@@ -56,8 +56,8 @@
 
 // Page table/directory entry flags.
 #define PTE_P		0x001	// Present
-#define PTE_W		0x002	// Writeable
-#define PTE_U		0x004	// User
+#define PTE_W		0x002	// Writeable 没有置位时，默认为可读。置位时，则为可读可写。
+#define PTE_U		0x004	// User  没有置位时，默认为内核。置位时，则为内核/用户。
 #define PTE_PWT		0x008	// Write-Through
 #define PTE_PCD		0x010	// Cache-Disable
 #define PTE_A		0x020	// Accessed
@@ -74,6 +74,8 @@
 
 // Address in page table or page directory entry
 #define PTE_ADDR(pte)	((physaddr_t) (pte) & ~0xFFF)
+//add by jianzzz
+#define PTE_FLAGS(pte)  ((physaddr_t) (pte) &  0xFFF)
 
 // Control Register flags
 #define CR0_PE		0x00000001	// Protection Enable

@@ -21,22 +21,34 @@ static void boot_aps(void);
 void
 i386_init(void)
 {
+	//see kernel.ld !!!
 	extern char edata[], end[];
 
 	// Before doing anything else, complete the ELF loading process.
 	// Clear the uninitialized global data (BSS) section of our program.
 	// This ensures that all static/global variables start out zero.
+	
+	/* 
+	可以看到两个外部字符数组变量 edata 和 end，其中 edata 表示的是 bss 节起始位置（虚拟地址）,
+    而 end 则是表示内核可执行程序结束位置（虚拟地址）。由 2.1 节中对 ELF
+	文件的讲解我们可以知道 bss 节是文件在内存中的最后一部分，于是 edata 与 end 之间的部
+	分便是 bss 节的部分，我们又知道 bss 节的内容是未初始化的变量，而这些变量是默认为零
+	的，所以在一开始的时候程序要用 memset(edata, 0, end - edata)这句代码将这些变量都置为
+	零。
+	*/
+
 	memset(edata, 0, end - edata);
 
 	// Initialize the console.
 	// Can't call cprintf until after we do this!
 	cons_init();
-
+ 
 	cprintf("6828 decimal is %o octal!\n", 6828);
 
 	// Lab 2 memory management initialization functions
 	mem_init();
 
+ 
 	// Lab 3 user environment initialization functions
 	env_init();
 	trap_init();
@@ -58,7 +70,7 @@ i386_init(void)
 	// Don't touch -- used by grading script!
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
-	// Touch all you want.
+	// Touch all you want. 
 	ENV_CREATE(user_primes, ENV_TYPE_USER);
 #endif // TEST*
 
@@ -95,7 +107,16 @@ boot_aps(void)
 		// Wait for the CPU to finish some basic setup in mp_main()
 		while(c->cpu_status != CPU_STARTED)
 			;
-	}
+	} 
+	ENV_CREATE(user_breakpoint, ENV_TYPE_USER);
+#endif // TEST*
+
+	// We only have one user environment for now, so just run it.
+	env_run(&envs[0]);
+ 
+	// Drop into the kernel monitor.
+	while (1)
+		monitor(NULL);  
 }
 
 // Setup code for APs

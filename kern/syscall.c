@@ -12,6 +12,7 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 
+static envid_t sys_getenvid(void);
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
 // Destroys the environment on memory errors.
@@ -22,7 +23,10 @@ sys_cputs(const char *s, size_t len)
 	// Destroy the environment if not.
 
 	// LAB 3: Your code here.
-
+	//see in kern/env.c : int	envid2env(envid_t envid, struct Env **env_store, bool checkperm);
+	//struct Env* e ;
+	//envid2env(sys_getenvid(),&e,1);
+	user_mem_assert(curenv, s, len, PTE_U);//see in kern/pmap.c
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
 }
@@ -38,7 +42,7 @@ sys_cgetc(void)
 // Returns the current environment's envid.
 static envid_t
 sys_getenvid(void)
-{
+{ 
 	return curenv->env_id;
 }
 
@@ -269,11 +273,24 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 {
 	// Call the function corresponding to the 'syscallno' parameter.
 	// Return any appropriate return value.
-	// LAB 3: Your code here.
-
-	panic("syscall not implemented");
+	// LAB 3: Your code here. 
+	//panic("syscall not implemented");
 
 	switch (syscallno) {
+	case SYS_cputs:{
+		sys_cputs((char *)a1,a2); //refer to lib/syscall.c
+		return 0;
+	}
+	case SYS_cgetc:{
+		return sys_cgetc();
+	}
+	case SYS_getenvid:{
+		return sys_getenvid();
+	}
+	case SYS_env_destroy:{
+		return sys_env_destroy(a1);
+	}
+	case NSYSCALLS:
 	default:
 		return -E_NO_SYS;
 	}

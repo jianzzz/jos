@@ -53,8 +53,13 @@ entry:
 	# sufficient until we set up our real page table in mem_init
 	# in lab 2.
 
+	# 注意到内核代码的执行是从KERNBASE+1MB开始的，而不是KERNBASE!!!
+	# 由于虚拟内存机制还没建立，所以在kern/entrypgdir.c里面手写了4MB的页表，
+	# 把[0,4MB)物理地址同时映射到线性地址[0, 4MB)和[KERNBASE, KERNBASE+4MB)中
+	
 	# Load the physical address of entry_pgdir into cr3.  entry_pgdir
 	# is defined in entrypgdir.c.
+	# 此时还没开启分页，需要RELOC将线性地址转化为物理地址
 	movl	$(RELOC(entry_pgdir)), %eax
 	movl	%eax, %cr3
 	# Turn on paging.
@@ -65,14 +70,22 @@ entry:
 	# Now paging is enabled, but we're still running at a low EIP
 	# (why is this okay?).  Jump up above KERNBASE before entering
 	# C code.
+	# 线性地址[0, 4MB)和[KERNBASE, KERNBASE+4MB)同时映射到[0,4MB)物理地址
+	# 如果不映射线性地址[0, 4MB)，则low eip的线性地址不在可访问线性地址范围内，将出现非法访问
 	mov	$relocated, %eax
-	jmp	*%eax
+	jmp	*%eax # jmp 之后eip将会加上KERNBASE !!!
 relocated:
 
 	# Clear the frame pointer register (EBP)
 	# so that once we get into debugging C code,
 	# stack backtraces will be terminated properly.
 	movl	$0x0,%ebp			# nuke frame pointer
+
+	# 可以看到在这里定义了两个全局变量 bootstack 和 bootstacktop， bootstack 标识了内存中
+	# 的一个位置，表示从这里开始的 KSTKSIZE 个字节的区域都是属于这个临时堆栈的
+	# (KSTKSIZE 在 inc/memlayout.h 中定义为 32k)，而 bootstacktop 则指向的是这段区域后的第
+	# 一个字节，由于刚开始的时候堆栈是空的，所以栈顶便是 bootstacktop 所指向的位置，于是
+	# 程序便将 bootstacktop 的值赋给了 esp 寄存器。
 
 	# Set the stack pointer
 	movl	$(bootstacktop),%esp

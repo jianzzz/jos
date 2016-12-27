@@ -119,7 +119,14 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
-
+	env_free_list = NULL;  
+    int i;  
+    for( i = NENV -1; i>=0; i--){  
+		envs[i].env_status = ENV_FREE;
+        envs[i].env_id = 0;  
+        envs[i].env_link = env_free_list;  
+        env_free_list = &envs[i];  
+    }  
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -182,6 +189,22 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+	//在没有具体的映射之前，物理地址都是直接加上KERNBASE作为虚拟地址的!!!
+	//内核空间的变量的虚拟地址也是如此
+	e->env_pgdir = (pde_t *) page2kva(p); //pa + KERNBASE !!!!!!
+	p->pp_ref = 1;
+	//use kern_pgdir as a template
+	/*
+	由于每个用户进程都需要共享内核空间，所以对于用户进程而言，在UTOP以上的部分，和系统内核的空间是完全一样的。
+	因此在pgdir开始设置的时候，只需要在一级页表目录上，把共享部分的一级页表目录部分复制进用户进程的地址空间就可以了，
+	这样，就实现了页面的共享。因为一级页目录里面存储的是二级页表目录的物理地址，其直接映射到物理内存部分，
+	而共享的内核部分的二级页目录在前期的内核操作中，已经完成了映射，所以二级页目录是不需要初始化的。
+	简单来说，不需要映射二级页表的原因是，用户进程可以和内核共用这些二级页表。
+
+	UTOP以下部分清空: 注意4G虚拟地址空间是由低到高每4M按顺序映射到页目录的一项的，因此需要取出UTOP的PDX索引部分，将前PDX项清空。
+	*/
+	memcpy(e->env_pgdir,kern_pgdir,PGSIZE);
+	memset(e->env_pgdir,0,UTOP >> PTSHIFT);
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -212,12 +235,13 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	if ((r = env_setup_vm(e)) < 0)
 		return r;
 
+	//todo...?????????????????????
 	// Generate an env_id for this environment.
 	generation = (e->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);
 	if (generation <= 0)	// Don't create a negative env_id.
 		generation = 1 << ENVGENSHIFT;
 	e->env_id = generation | (e - envs);
-
+ 
 	// Set the basic status variables.
 	e->env_parent_id = parent_id;
 	e->env_type = ENV_TYPE_USER;
@@ -228,8 +252,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	// to prevent the register values
 	// of a prior environment inhabiting this Env structure
 	// from "leaking" into our new environment.
-	memset(&e->env_tf, 0, sizeof(e->env_tf));
-
+	memset(&e->env_tf, 0, sizeof(e->env_tf)); //env_tf是Trapframe结构体，不是Trapframe结构体指针!
+ 
 	// Set up appropriate initial values for the segment registers.
 	// GD_UD is the user data segment selector in the GDT, and
 	// GD_UT is the user text segment selector (see inc/memlayout.h).
@@ -257,7 +281,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	// commit the allocation
 	env_free_list = e->env_link;
 	*newenv_store = e;
-
+ 
+	cprintf("env_id, %x\n", e->env_id);
 	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 	return 0;
 }
@@ -279,6 +304,22 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+
+	if(ROUNDUP((pte_t)va + len, PGSIZE) >= KERNBASE){ 
+    	panic("region_alloc panic, out of memory1");
+	}
+	int npages = (ROUNDUP((pte_t)va + len, PGSIZE) - ROUNDDOWN((pte_t)va, PGSIZE)) / PGSIZE;  
+	struct PageInfo *p = NULL; 
+	int i=0;
+  	for(; i<npages; i++){
+		if (!(p = page_alloc(ALLOC_ZERO))){
+			 panic("region_alloc panic, out of memory2");
+		}
+		//map, use page_insert
+		if(page_insert(e->env_pgdir,p,(void*)((pte_t)va+i*PGSIZE),PTE_U|PTE_W)!=0){
+			panic("region_alloc panic, out of memory3");
+		}
+  	} 
 }
 
 //
@@ -334,12 +375,39 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  to make sure that the environment starts executing there.
 	//  What?  (See env_run() and env_pop_tf() below.)
 
-	// LAB 3: Your code here.
+	// LAB 3: Your code here. 
+	struct Elf *elf = (struct Elf *)binary;
+	if (elf->e_magic != ELF_MAGIC)
+		panic("load_icode"); 
+	struct Proghdr *ph = (struct Proghdr *)(binary+elf->e_phoff);
 
+	lcr3(PADDR(e->env_pgdir));
+
+	int i;
+	for (i = 0; i < elf->e_phnum; ++i)
+	{ 
+		if(ph->p_type != ELF_PROG_LOAD) {//不可载入段  
+			ph++;
+		 	continue;
+		}
+		//xv6分配用户空间是连续的, 给出起始地址va和结束地址，然后ROUNDUP(va)，根据结束地址分配了足够的页空间，
+		//va的值是结束地址，而不是当前空间顶端。读取下一段的时候，新的开始地址是上次结束地址, 新的结束地址是ph.vaddr + ph.memsz。 
+		//jos分配用户空间不是连续的,而是根据ph->p_va作为每次的开始地址，以p_memsz为长度进行页分配。
+		region_alloc(e,(void*)ph->p_va,ph->p_memsz);
+		//read into env's memory , need env's pgdir
+		memcpy((char*)ph->p_va,(char*)(binary + ph->p_offset),ph->p_filesz);
+		ph++;
+	}
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
-	// LAB 3: Your code here.
+	// LAB 3: Your code here. 
+	region_alloc(e,(void*)USTACKTOP - PGSIZE,PGSIZE);
+
+	//todo...binary的数据位于内核空间的哪个节？
+	e->env_tf.tf_eip = elf->e_entry;  // main 
+
+	lcr3(PADDR(kern_pgdir));
 }
 
 //
@@ -353,6 +421,14 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+	struct Env *newEnv;
+	//Allocates a new env 
+	int i = env_alloc(&newEnv,0);
+	if(i<0) panic("env_create");
+	//loads the named elf binary into
+	load_icode(newEnv,binary);
+	//set env_type
+	newEnv->env_type = type;
 }
 
 //
@@ -482,7 +558,16 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
+	if(!e) panic("env_run panic"); 
+	if(curenv && curenv->env_status == ENV_RUNNING){
+		curenv->env_status = ENV_RUNNABLE;
+	}	
+	curenv = e;
+	e->env_status = ENV_RUNNING;
+	e->env_runs += 1;
+	lcr3(PADDR(e->env_pgdir)); 
 
-	panic("env_run not yet implemented");
+	env_pop_tf(&(e->env_tf));//never return  
+	//panic("env_run not yet implemented");
 }
 

@@ -7,6 +7,7 @@
 #endif
 
 #include <inc/types.h>
+#include <kern/color.h>
 
 #define MONO_BASE	0x3B4
 #define MONO_BUF	0xB0000
@@ -22,5 +23,11 @@ int cons_getc(void);
 
 void kbd_intr(void); // irq 1
 void serial_intr(void); // irq 4
+
+/***** 
+	setcolor function add by zhuangjian, 2016/07/17 
+*****/
+void setcolor(const char * bg, const char * ch);
+
 
 #endif /* _CONSOLE_H_ */

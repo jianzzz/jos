@@ -282,7 +282,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	env_free_list = e->env_link;
 	*newenv_store = e;
  
-	cprintf("env_id, %x\n", e->env_id);
+	//cprintf("env_id, %x\n", e->env_id);
 	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 	return 0;
 }
@@ -430,6 +430,22 @@ env_create(uint8_t *binary, enum EnvType type)
 	//set env_type
 	newEnv->env_type = type;
 }
+ 
+void
+env_create_priority(uint8_t *binary, enum EnvType type,enum EnvPriority priority)
+{
+	// LAB 3: Your code here.
+	struct Env *newEnv;
+	//Allocates a new env 
+	int i = env_alloc(&newEnv,0);
+	if(i<0) panic("env_create");
+	//loads the named elf binary into
+	load_icode(newEnv,binary);
+	//set env_type
+	newEnv->env_type = type;
+
+	newEnv->priority = priority;
+}
 
 //
 // Frees env e and all memory it uses.
@@ -566,6 +582,9 @@ env_run(struct Env *e)
 	e->env_status = ENV_RUNNING;
 	e->env_runs += 1;
 	lcr3(PADDR(e->env_pgdir)); 
+
+	//lab4
+	unlock_kernel();
 
 	env_pop_tf(&(e->env_tf));//never return  
 	//panic("env_run not yet implemented");

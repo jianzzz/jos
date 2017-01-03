@@ -230,8 +230,7 @@ mem_init(void)
 	//       the kernel overflows its stack, it will fault rather than
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
-	// Your code goes here:
-	//todo: [KSTACKTOP-PTSIZE, KSTACKTOP-KSTKSIZE) ????????????????????????????????????????????
+	// Your code goes here: 
 	boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
 	// by jianzzz, set 4MB page .......................
 	//boot_map_region_4m(kern_pgdir, KSTACKTOP - KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
@@ -300,7 +299,13 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-
+	int i=0;
+	uint32_t bottom_stack = KSTACKTOP - KSTKSIZE;
+	for (i = 0; i < NCPU; i++) {
+		boot_map_region(kern_pgdir, bottom_stack, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W | PTE_P);
+		bottom_stack -= KSTKGAP; // guard
+		bottom_stack -= KSTKSIZE;
+	}
 }
 
 // --------------------------------------------------------------
@@ -327,22 +332,22 @@ page_init(void)
 
 	// The example code here marks all physical pages as free.
 	// However this is not truly the case.  What memory is free?
-	//  第一页数据是被使用的，该页保存了实模式IDT和BIOS数据结构
 	//  1) Mark physical page 0 as in use.
 	//     This way we preserve the real-mode IDT and BIOS structures
 	//     in case we ever need them.  (Currently we don't, but...)
-	//  第二页至基本内存结束位置(640K)是可用的
+	//  第一页数据是被使用的，该页保存了实模式IDT和BIOS数据结构
 	//  2) The rest of base memory, [PGSIZE, npages_basemem * PGSIZE)
 	//     is free.
-	//  [IOPHYSMEM, EXTPHYSMEM),即[0x0A0000,0x100000)--[640K,1MB)是被使用的
+	//  第二页至基本内存结束位置(640K)是可用的
 	//  3) Then comes the IO hole [IOPHYSMEM, EXTPHYSMEM), which must
 	//     never be allocated.
-	//  扩展内存开始位置至当前pages数组存储的末端为不可使用的部分，其中包括页目录空间和映射内存的pages数组空间!!!
-	//  当前pages数组存储的末端开始至可用内存末端即为可用的
+	//  [IOPHYSMEM, EXTPHYSMEM),即[0x0A0000,0x100000)--[640K,1MB)是被使用的
 	//  4) Then extended memory [EXTPHYSMEM, ...).
 	//     Some of it is in use, some is free. Where is the kernel
 	//     in physical memory?  Which pages are already in use for
 	//     page tables and other data structures?
+	//  扩展内存开始位置至当前pages数组存储的末端为不可使用的部分，其中包括页目录空间和映射内存的pages数组空间!!!
+	//  当前pages数组存储的末端开始至可用内存末端即为可用的
 	//
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
@@ -360,19 +365,19 @@ page_init(void)
 	// 而不是与0x0的差, 需要加上1M的空间
 	// 1M = 256 page 
 	// uint32_t num_kernelpages = (((uint32_t) boot_alloc(0)) - KERNBASE) / PGSIZE;
-	//uint32_t page_PageInfoEnd = npages_basemem + num_pages_io_hole + num_kernelpages; 
-	uint32_t page_PageInfoEnd = (((uint32_t) boot_alloc(0)) - KERNBASE) / PGSIZE + 256;    
+	//uint32_t page_KernelPageInfoEnd = npages_basemem + num_pages_io_hole + num_kernelpages; 
+	uint32_t page_KernelPageInfoEnd = (((uint32_t) boot_alloc(0)) - KERNBASE) / PGSIZE + 256;    
 	 
 	page_free_list = NULL;
 	size_t i;
 	//pages数组与实际物理空间存在映射关系，但没有使用实际空间存储物理页位置
 	for (i = 0; i < npages; i++) {
 		if(i==0 ||
-			//todo: question 1: 7th page at MPRENTRY_PADDR, reserved for CPU startup code ?
-
+			//Lab4 : page at MPRENTRY_PADDR, reserved for CPU startup code . e.g. 0x7000
+			i == PGNUM(MPENTRY_PADDR) ||
 			//(i>=page_IOPHYSMEM && i<page_EXTPHYSMEMBEGIN) ||
-			//(i>=page_EXTPHYSMEMBEGIN && i<page_PageInfoEnd) ||
-			(i>=page_IOPHYSMEMBEGIN && i<page_PageInfoEnd)
+			//(i>=page_EXTPHYSMEMBEGIN && i<page_KernelPageInfoEnd) ||
+			(i>=page_IOPHYSMEMBEGIN && i<page_KernelPageInfoEnd)
 			){
 			pages[i].pp_ref = 1;
 			continue;	
@@ -703,6 +708,8 @@ tlb_invalidate(pde_t *pgdir, void *va)
 // location.  Return the base of the reserved region.  size does *not*
 // have to be multiple of PGSIZE.
 //
+// jianzzz: you may use mmio_map_region() many times! Every time you give pa and size,
+// we map pa on the incremental va, and the map-range is size(roundup it).
 void *
 mmio_map_region(physaddr_t pa, size_t size)
 {
@@ -730,7 +737,14 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	uint32_t sizeup = (uint32_t)ROUNDUP((char *) size, PGSIZE);
+	if(base + sizeup > MMIOLIM){
+		panic("mmio_map_region: requested size to map went over MMIOLIM");
+	}
+	boot_map_region(kern_pgdir,base,sizeup,pa,PTE_PCD | PTE_PWT | PTE_W | PTE_P);
+	base += sizeup; 
+	//panic("mmio_map_region not implemented");
+	return (void *)(base-sizeup);
 }
 
 static uintptr_t user_mem_check_addr;
@@ -757,7 +771,7 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-	cprintf("user_mem_check va: %x, len: %x\n", va, len);
+	//cprintf("user_mem_check va: %x, len: %x\n", va, len);
 	uint32_t begin = (uint32_t)ROUNDDOWN((char*)va,PGSIZE);
 	uint32_t end = (uint32_t)ROUNDUP((char*)(va+len),PGSIZE);
 	uint32_t i=0;
@@ -768,7 +782,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 			return -E_FAULT;
 		}
 	}
-	cprintf("user_mem_check success va: %x, len: %x\n", va, len);
+	//cprintf("user_mem_check success va: %x, len: %x\n", va, len);
 	return 0;
 }
 

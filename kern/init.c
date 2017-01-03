@@ -54,7 +54,7 @@ i386_init(void)
 	trap_init();
 
 	// Lab 4 multiprocessor initialization functions
-	mp_init();
+	mp_init();//see in mpconfig.c
 	lapic_init();
 
 	// Lab 4 multitasking initialization functions
@@ -62,18 +62,25 @@ i386_init(void)
 
 	// Acquire the big kernel lock before waking up APs
 	// Your code here:
-
+	lock_kernel();
 	// Starting non-boot CPUs
-	boot_aps();
+	boot_aps(); 
 
 #if defined(TEST)
 	// Don't touch -- used by grading script!
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else 
 	// Touch all you want.  
-	ENV_CREATE(user_primes, ENV_TYPE_USER);
+	//ENV_CREATE(user_primes, ENV_TYPE_USER);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_HIGH);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_1);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_2);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_3);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_4);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_5);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_LOW);
+	//ENV_CREATE(user_yield, ENV_TYPE_USER);
 #endif // TEST*
-
 	// Schedule and run the first user environment!
 	sched_yield();
 }
@@ -92,18 +99,20 @@ boot_aps(void)
 	struct CpuInfo *c;
 
 	// Write entry code to unused memory at MPENTRY_PADDR
-	code = KADDR(MPENTRY_PADDR);
+	code = KADDR(MPENTRY_PADDR); //0x7000
 	memmove(code, mpentry_start, mpentry_end - mpentry_start);
 
 	// Boot each AP one at a time
 	for (c = cpus; c < cpus + ncpu; c++) {
+		//cpunum() see in lapic.c
 		if (c == cpus + cpunum())  // We've started already.
 			continue;
 
 		// Tell mpentry.S what stack to use 
-		mpentry_kstack = percpu_kstacks[c - cpus] + KSTKSIZE;
+		mpentry_kstack = percpu_kstacks[c - cpus] + KSTKSIZE; //used in mpentry.S
 		// Start the CPU at mpentry_start
-		lapic_startap(c->cpu_id, PADDR(code));
+		//cprintf("c->cpu_id=%d\n", c->cpu_id);
+		lapic_startap(c->cpu_id, PADDR(code));// cpus has been initialized in mpconfig.c/mp_init()
 		// Wait for the CPU to finish some basic setup in mp_main()
 		while(c->cpu_status != CPU_STARTED)
 			;
@@ -127,10 +136,11 @@ mp_main(void)
 	// to start running processes on this CPU.  But make sure that
 	// only one CPU can enter the scheduler at a time!
 	//
-	// Your code here:
-
+	// Your code here: 
+	lock_kernel();
+	sched_yield(); 
 	// Remove this after you finish Exercise 4
-	for (;;);
+	//for (;;);
 }
 
 /*

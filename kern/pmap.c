@@ -611,7 +611,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
 	// Fill this function in 
 	pte_t *pte = pgdir_walk(pgdir,va,true); 
-	if(pte == NULL) return -1; 
+	if(pte == NULL) return -E_NO_MEM; 
 	if(*pte & PTE_P){ //already a page mapped at 'va'
 		//*pte的内容已经是物理地址，将其低12位清零
 		//如果是相同页的话，应该允许修改权限,直接返回0。注意这里不能先remove再insert，因为一旦remove，

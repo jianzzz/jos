@@ -88,7 +88,16 @@ sys_exofork(void)
 	// will appear to return 0.
 
 	// LAB 4: Your code here.
-	panic("sys_exofork not implemented");
+	//panic("sys_exofork not implemented");
+	struct Env *newEnv; 
+	//setup kernal stack, page dir, trapframe...
+	int r = env_alloc(&newEnv,curenv->env_id);
+	if(r<0) return r;
+	newEnv->env_status = ENV_NOT_RUNNABLE;
+	newEnv->env_tf = curenv->env_tf;
+	//clear child's eax,so it will return pid 0
+	newEnv->env_tf.tf_regs.reg_eax = 0;
+	return newEnv->env_id;
 }
 
 // Set envid's env_status to status, which must be ENV_RUNNABLE
@@ -108,7 +117,16 @@ sys_env_set_status(envid_t envid, int status)
 	// envid's status.
 
 	// LAB 4: Your code here.
-	panic("sys_env_set_status not implemented");
+	//panic("sys_env_set_status not implemented");
+	struct Env *e; 
+	// check whether the current environment has permission to set envid's status. 
+	// i.e.,the specified environment must be either the
+	// current environment or an immediate child of the current environment.
+	int r = envid2env(envid,&e,true);
+	if(r<0) return r;//-E_BAD_ENV 
+	if(status != ENV_RUNNABLE && status != ENV_NOT_RUNNABLE) return -E_INVAL;
+	e->env_status = status;
+	return 0;
 }
 
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
@@ -153,7 +171,28 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	//   allocated!
 
 	// LAB 4: Your code here.
-	panic("sys_page_alloc not implemented");
+	//panic("sys_page_alloc not implemented");
+	struct Env *e; 
+	// check whether the current environment has permission to change envid. 
+	// i.e.,the specified environment must be either the
+	// current environment or an immediate child of the current environment.
+	int r = envid2env(envid,&e,true); 
+	if(r<0) return r;//-E_BAD_ENV 
+	
+	if((uint32_t)va >= UTOP || (uint32_t)va%PGSIZE != 0) return -E_INVAL;
+	
+	if(!(perm & PTE_U) || !(perm & PTE_P)) return -E_INVAL;
+	
+	struct PageInfo *page = page_alloc(ALLOC_ZERO);
+	if(page == NULL) return -E_NO_MEM;
+	
+	//store page's mapping physical address and perm in va's mapping page table entry
+	r = page_insert(e->env_pgdir, page, va, perm);
+	if(r<0) {
+		page_remove(e->env_pgdir,va);
+		return r;//-E_NO_MEM
+	}
+	return 0;
 }
 
 // Map the page of memory at 'srcva' in srcenvid's address space
@@ -184,7 +223,36 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	//   check the current permissions on the page.
 
 	// LAB 4: Your code here.
-	panic("sys_page_map not implemented");
+	//panic("sys_page_map not implemented");
+	struct Env *srce,*dste; 
+	// check whether the current environment has permission to change envid. 
+	// i.e.,the specified environment must be either the
+	// current environment or an immediate child of the current environment.
+	int r = envid2env(srcenvid,&srce,true);
+	if(r<0) return r;//-E_BAD_ENV 
+	r = envid2env(dstenvid,&dste,true);//envid 0 means "the current environment."
+	if(r<0) return r;//-E_BAD_ENV 
+	
+	if((uint32_t)srcva >= UTOP || (uint32_t)srcva%PGSIZE != 0) return -E_INVAL;
+	if((uint32_t)dstva >= UTOP || (uint32_t)dstva%PGSIZE != 0) return -E_INVAL;
+	
+	//return the page mapped at virtual address 'va'
+	//pte_store stores the address of the page table entry for this page
+	pte_t *pte_store;
+	struct PageInfo *page = page_lookup(srce->env_pgdir, srcva, &pte_store);
+	if(page == NULL) return -E_INVAL;//no page mapped at srcva
+
+	if(!(perm & PTE_U) || !(perm & PTE_P)) return -E_INVAL;
+	
+	if(!(*pte_store & PTE_W) && (perm & PTE_W)) return -E_INVAL;//srcva is read-only but perm is writable
+
+	//store page's mapping physical address and perm in dstva's mapping page table entry
+	r = page_insert(dste->env_pgdir, page, dstva, perm);// allow to create page table
+	if(r<0) {
+		page_remove(dste->env_pgdir,dstva);
+		return r;//-E_NO_MEM
+	}
+	return 0;
 }
 
 // Unmap the page of memory at 'va' in the address space of 'envid'.
@@ -200,7 +268,18 @@ sys_page_unmap(envid_t envid, void *va)
 	// Hint: This function is a wrapper around page_remove().
 
 	// LAB 4: Your code here.
-	panic("sys_page_unmap not implemented");
+	//panic("sys_page_unmap not implemented");
+	struct Env *e; 
+	// check whether the current environment has permission to change envid. 
+	// i.e.,the specified environment must be either the
+	// current environment or an immediate child of the current environment.
+	int r = envid2env(envid,&e,true);
+	if(r<0) return r;//-E_BAD_ENV 
+	
+	if((uint32_t)va >= UTOP || (uint32_t)va%PGSIZE != 0) return -E_INVAL;
+	
+	page_remove(e->env_pgdir,va);
+	return 0;
 }
 
 // Try to send 'value' to the target env 'envid'.

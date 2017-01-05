@@ -16,6 +16,8 @@ enum {
 	SYS_yield,
 	SYS_ipc_try_send,
 	SYS_ipc_recv,
+	SYS_env_set_priority,
+	SYS_env_get_priority,
 	NSYSCALLS
 };
 

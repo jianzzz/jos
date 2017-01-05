@@ -72,7 +72,7 @@ i386_init(void)
 #else 
 	// Touch all you want.  
 	//ENV_CREATE(user_primes, ENV_TYPE_USER);
-	/*
+	/* 
 	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_HIGH);
 	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_1);
 	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_2);
@@ -80,8 +80,9 @@ i386_init(void)
 	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_4);
 	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_5);
 	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_LOW);
+	ENV_CREATE(user_dumbfork, ENV_TYPE_USER); 
 	*/
-	ENV_CREATE(user_dumbfork, ENV_TYPE_USER);
+	ENV_CREATE(user_envpriority, ENV_TYPE_USER);
 #endif // TEST*
 	// Schedule and run the first user environment!
 	sched_yield();

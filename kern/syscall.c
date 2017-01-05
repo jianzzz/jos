@@ -90,11 +90,12 @@ sys_exofork(void)
 	// LAB 4: Your code here.
 	//panic("sys_exofork not implemented");
 	struct Env *newEnv; 
-	//setup kernal stack, page dir, trapframe...
+	//set kernal stack, page dir, trapframe...
 	int r = env_alloc(&newEnv,curenv->env_id);
 	if(r<0) return r;
-	newEnv->env_status = ENV_NOT_RUNNABLE;
-	newEnv->env_tf = curenv->env_tf;
+	newEnv->env_status = ENV_NOT_RUNNABLE; 
+	newEnv->env_tf = curenv->env_tf; 
+	//or : memmove((void *) &newEnv->env_tf, (void *) &curenv->env_tf, sizeof(struct Trapframe));
 	//clear child's eax,so it will return pid 0
 	newEnv->env_tf.tf_regs.reg_eax = 0;
 	return newEnv->env_id;
@@ -181,8 +182,11 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	
 	if((uint32_t)va >= UTOP || (uint32_t)va%PGSIZE != 0) return -E_INVAL;
 	
-	if(!(perm & PTE_U) || !(perm & PTE_P)) return -E_INVAL;
-	
+	if((perm & PTE_U) != PTE_U || (perm & PTE_P) != PTE_P) return -E_INVAL;
+	//#define PTE_SYSCALL	(PTE_AVAIL | PTE_P | PTE_W | PTE_U)
+	if ((perm & ~PTE_SYSCALL) != 0) //no other bits may be set
+		return -E_INVAL;
+
 	struct PageInfo *page = page_alloc(ALLOC_ZERO);
 	if(page == NULL) return -E_NO_MEM;
 	
@@ -242,9 +246,12 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	struct PageInfo *page = page_lookup(srce->env_pgdir, srcva, &pte_store);
 	if(page == NULL) return -E_INVAL;//no page mapped at srcva
 
-	if(!(perm & PTE_U) || !(perm & PTE_P)) return -E_INVAL;
+	if((perm & PTE_U) != PTE_U || (perm & PTE_P) != PTE_P) return -E_INVAL;
+	//#define PTE_SYSCALL	(PTE_AVAIL | PTE_P | PTE_W | PTE_U)
+	if ((perm & ~PTE_SYSCALL) != 0) //no other bits may be set
+		return -E_INVAL;
 	
-	if(!(*pte_store & PTE_W) && (perm & PTE_W)) return -E_INVAL;//srcva is read-only but perm is writable
+	if((*pte_store & PTE_W) != PTE_W && ((perm & PTE_W) == PTE_W)) return -E_INVAL;//srcva is read-only but perm is writable
 
 	//store page's mapping physical address and perm in dstva's mapping page table entry
 	r = page_insert(dste->env_pgdir, page, dstva, perm);// allow to create page table
@@ -346,6 +353,33 @@ sys_ipc_recv(void *dstva)
 	return 0;
 }
 
+// Set envid's priority to priority 
+//
+// Returns 0 on success, < 0 on error.  Errors are:
+//	-E_BAD_ENV if environment envid doesn't currently exist,
+//		or the caller doesn't have permission to change envid.
+//	-E_INVAL if status is not a valid priority for an environment.
+static int
+sys_env_set_priority(envid_t envid, uint32_t priority)
+{
+	struct Env *e; 
+	// check whether the current environment has permission to set envid's status. 
+	// i.e.,the specified environment must be either the
+	// current environment or an immediate child of the current environment.
+	int r = envid2env(envid,&e,true);
+	if(r<0) return r;//-E_BAD_ENV 
+	if(priority <  ENV_PRIORITY_HIGH || priority > ENV_PRIORITY_LOW) return -E_INVAL;
+	e->priority = priority;
+	return 0; 
+}
+
+// Returns the current environment's envid.
+static uint32_t
+sys_env_get_priority(void)
+{ 
+	return curenv->priority;
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -372,8 +406,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	case SYS_yield:{
 		sys_yield();
 		return 0;
-	}
-
+	} 
 	case SYS_exofork:{
 		return sys_exofork();
 	}
@@ -397,6 +430,12 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	}
 	case SYS_ipc_recv:{ 
 		return sys_ipc_recv((void *)a1); 
+	}
+	case SYS_env_set_priority:{ 
+		return sys_env_set_priority((envid_t)a1,a2); 
+	}
+	case SYS_env_get_priority:{ 
+		return sys_env_get_priority(); 
 	}
 	case NSYSCALLS:
 	default:

@@ -351,12 +351,42 @@ page_fault_handler(struct Trapframe *tf)
 	//   To change what the user environment runs, modify 'curenv->env_tf'
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
-	// LAB 4: Your code here.
+	// LAB 4: Your code here. 
+	//1. test if has page fault upcall
+	if (curenv->env_pgfault_upcall == NULL ||
+		//2. test if the exception stack overflows
+		tf->tf_esp > UXSTACKTOP || (tf->tf_esp > USTACKTOP && tf->tf_esp < (UXSTACKTOP - PGSIZE))){
+		// Destroy the environment that caused the fault.
+		cprintf("[%08x] user fault va %08x ip %08x\n",
+			curenv->env_id, fault_va, tf->tf_eip);
+		print_trapframe(tf);
+		env_destroy(curenv);
+	}
 
-	// Destroy the environment that caused the fault.
-	cprintf("[%08x] user fault va %08x ip %08x\n",
-		curenv->env_id, fault_va, tf->tf_eip);
-	print_trapframe(tf);
-	env_destroy(curenv);
+	//determine user exception stack pointer
+	uint32_t exception_stack_top = 0;
+	if(tf->tf_esp <= USTACKTOP){
+		exception_stack_top = UXSTACKTOP - sizeof(struct UTrapframe);
+	}else{
+		//+4 : leave an extra word between the current top of the exception stack
+		exception_stack_top = tf->tf_esp - sizeof(struct UTrapframe) - 4;
+	}
+
+	//3. test if allocate a page for its exception stack or if can write to it
+	user_mem_assert(curenv, (void *)(UXSTACKTOP-PGSIZE), PGSIZE, PTE_W | PTE_U);//may not return
+
+	//write UTrapframe in the stack
+	struct UTrapframe* utf = (struct UTrapframe*)exception_stack_top;
+	utf->utf_fault_va = fault_va;
+	utf->utf_err = tf->tf_err;
+	utf->utf_regs = tf->tf_regs;
+	utf->utf_eip = tf->tf_eip;
+	utf->utf_eflags = tf->tf_eflags;
+	utf->utf_esp = tf->tf_esp;
+
+	//branch to curenv->env_pgfault_upcall, that means we should change trapframe's esp and eip
+ 	tf->tf_esp = (uintptr_t) exception_stack_top;
+	tf->tf_eip = (uintptr_t) curenv->env_pgfault_upcall;
+	env_run(curenv);
 }
 

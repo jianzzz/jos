@@ -142,7 +142,15 @@ static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
 	// LAB 4: Your code here.
-	panic("sys_env_set_pgfault_upcall not implemented");
+	//panic("sys_env_set_pgfault_upcall not implemented"); 
+	struct Env *e; 
+	// check whether the current environment has permission to change envid. 
+	// i.e.,the specified environment must be either the
+	// current environment or an immediate child of the current environment.
+	int r = envid2env(envid,&e,true);
+	if(r<0) return r;//-E_BAD_ENV 
+	e->env_pgfault_upcall = func;
+	return 0;
 }
 
 // Allocate a page of memory and map it at 'va' with permission
@@ -363,7 +371,7 @@ static int
 sys_env_set_priority(envid_t envid, uint32_t priority)
 {
 	struct Env *e; 
-	// check whether the current environment has permission to set envid's status. 
+	// check whether the current environment has permission to change envid. 
 	// i.e.,the specified environment must be either the
 	// current environment or an immediate child of the current environment.
 	int r = envid2env(envid,&e,true);

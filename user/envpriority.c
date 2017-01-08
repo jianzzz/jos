@@ -31,10 +31,14 @@ duppage(envid_t dstenv, void *addr)
 	int r;
 
 	// This is NOT what you should do in your fork.
+	//alloc a page mapping at child's addr
 	if ((r = sys_page_alloc(dstenv, addr, PTE_P|PTE_U|PTE_W)) < 0)
 		panic("sys_page_alloc: %e", r);
+	//map child's new page(mapping at addr) at parent's UTEMP
 	if ((r = sys_page_map(dstenv, addr, 0, UTEMP, PTE_P|PTE_U|PTE_W)) < 0)
 		panic("sys_page_map: %e", r);
+	//copy page data mapping at parent's addr to page mapping at parent's UTEMP
+	//as a result, it fills in child's page
 	memmove(UTEMP, addr, PGSIZE);
 	if ((r = sys_page_unmap(0, UTEMP)) < 0)
 		panic("sys_page_unmap: %e", r);
@@ -75,8 +79,7 @@ dumbfork_priority(uint32_t priority)
 		duppage(envid, addr);
 
 	// Also copy the stack we are currently running on.
-	duppage(envid, ROUNDDOWN(&addr, PGSIZE));
-
+	duppage(envid, ROUNDDOWN((void*)USTACKTOP - PGSIZE, PGSIZE)); 
 	// Start the child environment running
 	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
 		panic("sys_env_set_status: %e", r);

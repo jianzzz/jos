@@ -80,3 +80,55 @@ _pgfault_upcall:
 
 	// Return to re-execute the instruction that faulted.
 	// LAB 4: Your code here.
+
+// exception stack:
+//
+//	trap-time esp
+//	trap-time eflags
+//	trap-time eip
+//	utf_regs.reg_eax
+//	...
+//	utf_regs.reg_esi
+//	utf_regs.reg_edi
+//	utf_err (error code)
+//	utf_fault_va            <-- %esp
+//
+
+	addl $8, %esp  
+	movl %esp,%eax  
+	addl $32,%esp  
+	popl %ebx  
+	addl $4,%esp  
+	popl %esp  
+	pushl %ebx  
+	movl %eax,%esp  
+	popal  
+	addl $4,%esp  
+	popf  
+	popl %esp  
+	subl $4,%esp  
+	ret  
+
+
+//  no need to use the following, cause we leave an extra word first if recursive
+
+//	addl $48, %esp  
+//	popl %eax 
+//	subl $52, %esp  
+//	pushl %eax  
+//	addl $4, %esp 
+//	addl $8, %esp  
+//	movl %esp, %eax  
+//	addl $32, %esp  
+//	popl %ebx  
+//	addl $4, %esp  
+//	popl %esp  
+//	pushl %ebx  
+//	movl %eax, %esp  
+//	popal  
+//	addl $4,%esp  
+//	popf  
+//	subl $52, %esp  
+//	popl %esp  
+//	subl $4, %esp  
+//	ret  

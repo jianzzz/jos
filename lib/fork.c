@@ -54,7 +54,10 @@ duppage(envid_t envid, unsigned pn)
 	int r;
 
 	// LAB 4: Your code here.
-	panic("duppage not implemented");
+	//panic("duppage not implemented");
+	int r;
+ 	if ((r = sys_page_map(0, pn, envid, pn, PTE_P|PTE_U|PTE_COW)) < 0)
+		panic("sys_page_map: %e", r);
 	return 0;
 }
 
@@ -78,7 +81,37 @@ envid_t
 fork(void)
 {
 	// LAB 4: Your code here.
-	panic("fork not implemented");
+	//panic("fork not implemented");
+	set_pgfault_handler(pgfault);
+
+	envid_t envid;
+	uint8_t *addr;
+	int r;
+	extern unsigned char end[]; 
+
+	envid = sys_exofork();
+	if (envid < 0)
+		panic("sys_exofork: %e", envid);
+	if (envid == 0) {
+		// We're the child. 
+		set_pgfault_handler(pgfault);
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+
+	// We're the parent. 
+	for (addr = (uint8_t*) UTEXT; addr < UTOP - PGSIZE; addr += PGSIZE){
+		duppage(envid, addr);
+		duppage(0, addr);
+	}
+	if ((r = sys_page_alloc(envid, (void *)(UXSTACKTOP - PGSIZE), PTE_P|PTE_U|PTE_W)) < 0)
+		panic("sys_page_alloc: %e", r);
+ 
+	// Start the child environment running
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
+		panic("sys_env_set_status: %e", r);
+
+	return envid;
 }
 
 // Challenge!

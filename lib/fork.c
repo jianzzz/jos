@@ -25,7 +25,16 @@ pgfault(struct UTrapframe *utf)
 	//   (see <inc/memlayout.h>).
 
 	// LAB 4: Your code here.
+	if ((err & FEC_WR) == 0)
+		panic("pgfault: faulting address [%08x] not a write\n", addr);
 
+	if( (uvpd[PDX(addr)] & PTE_P) != PTE_P || 
+	    (uvpt[PTX(addr)] & PTE_P) != PTE_P || 
+	    (uvpt[PTX(addr)] & PTE_COW) != PTE_COW){
+		cprintf("addr=%x,PTX(addr)=%x,PGNUM(addr)=%x\n",addr,PTX(addr),PGNUM(addr));
+		//cprintf("(uvpt[PTX(addr)] & PTE_P)=%x,PTE_P=%x\n",(uvpt[PGNUM(addr)] & PTE_P),PTE_P);
+		panic("not copy-on-write");
+	}
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new
 	// page to the old page's address.
@@ -34,7 +43,15 @@ pgfault(struct UTrapframe *utf)
 
 	// LAB 4: Your code here.
 
-	panic("pgfault not implemented");
+	//panic("pgfault not implemented");
+	addr = ROUNDDOWN(addr, PGSIZE);
+	if ((r = sys_page_alloc(thisenv->env_id, PFTEMP, PTE_P|PTE_U|PTE_W)) < 0)
+		panic("allocating at %x in page fault handler: %e", addr, r);
+	memmove(addr, PFTEMP, PGSIZE);
+	if ((r = sys_page_map(thisenv->env_id, PFTEMP, thisenv->env_id, addr, PTE_P|PTE_U|PTE_W)) < 0)
+		panic("sys_page_map: %e", r);
+	if ((r = sys_page_unmap(thisenv->env_id, PFTEMP)) < 0)
+		panic("sys_page_unmap: %e", r);
 }
 
 //
@@ -54,10 +71,18 @@ duppage(envid_t envid, unsigned pn)
 	int r;
 
 	// LAB 4: Your code here.
-	//panic("duppage not implemented");
-	int r;
- 	if ((r = sys_page_map(0, pn, envid, pn, PTE_P|PTE_U|PTE_COW)) < 0)
-		panic("sys_page_map: %e", r);
+	//panic("duppage not implemented"); 
+	void *addr = (void *)(pn*PGSIZE);
+	if( (uvpt[PTX(addr)] & PTE_W) == PTE_W || 
+	    (uvpt[PTX(addr)] & PTE_COW) == PTE_COW){ 
+ 		if ((r = sys_page_map(0, (void *)addr, envid, (void *)addr, PTE_P|PTE_U|PTE_COW)) < 0){
+			panic("sys_page_map: %e", r);
+ 		}
+	}else{
+		if ((r = sys_page_map(0, (void *)addr, envid, (void *)addr, PTE_P|PTE_U)) < 0){
+			panic("sys_page_map: %e", r);
+ 		}
+	}
 	return 0;
 }
 
@@ -85,7 +110,7 @@ fork(void)
 	set_pgfault_handler(pgfault);
 
 	envid_t envid;
-	uint8_t *addr;
+	unsigned addr;
 	int r;
 	extern unsigned char end[]; 
 
@@ -100,17 +125,20 @@ fork(void)
 	}
 
 	// We're the parent. 
-	for (addr = (uint8_t*) UTEXT; addr < UTOP - PGSIZE; addr += PGSIZE){
-		duppage(envid, addr);
-		duppage(0, addr);
-	}
-	if ((r = sys_page_alloc(envid, (void *)(UXSTACKTOP - PGSIZE), PTE_P|PTE_U|PTE_W)) < 0)
-		panic("sys_page_alloc: %e", r);
- 
+	// map the page copy-on-write into the address space of the child 
+	// and then remap the page copy-on-write in its own address space
+	for (addr = UTEXT; addr < (unsigned)end; addr += PGSIZE){
+		duppage(envid, PGNUM(addr));
+		duppage(0, PGNUM(addr));
+	} 
+	// map the stack we are currently running on.
+	duppage(envid, PGNUM(ROUNDDOWN((void*)USTACKTOP - PGSIZE, PGSIZE))); 
+	duppage(0, PGNUM(ROUNDDOWN((void*)USTACKTOP - PGSIZE, PGSIZE))); 
+  
 	// Start the child environment running
 	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
 		panic("sys_env_set_status: %e", r);
-
+ 
 	return envid;
 }
 

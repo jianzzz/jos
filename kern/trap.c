@@ -370,6 +370,7 @@ page_fault_handler(struct Trapframe *tf)
 	}else{
 		//+4 : leave an extra word between the current top of the exception stack
 		exception_stack_top = tf->tf_esp - sizeof(struct UTrapframe) - 4;
+	cprintf("---------------------- %x\n", exception_stack_top);
 	}
 
 	//2. test if the exception stack overflows

@@ -64,7 +64,17 @@ TRAPHANDLER(entry_point13,T_GPFLT)
 TRAPHANDLER(entry_point14,T_PGFLT)
 # TRAPHANDLER(entry_point15,T_RES)
 TRAPHANDLER_NOEC(entry_point16,T_FPERR) 
-   
+# IRQs 0    
+TRAPHANDLER_NOEC(entry_point32,IRQ_OFFSET+IRQ_TIMER) 
+# IRQs 1
+TRAPHANDLER_NOEC(entry_point33,IRQ_OFFSET+IRQ_KBD) 
+# IRQs 4
+TRAPHANDLER_NOEC(entry_point36,IRQ_OFFSET+IRQ_SERIAL) 
+# IRQs 7
+TRAPHANDLER_NOEC(entry_point39,IRQ_OFFSET+IRQ_SPURIOUS) 
+# IRQs 14
+TRAPHANDLER_NOEC(entry_point46,IRQ_OFFSET+IRQ_IDE) 
+
 TRAPHANDLER_NOEC(entry_point48,T_SYSCALL) 
 
 /*
@@ -126,21 +136,21 @@ entry_points:
   .long 0#entry_point29
   .long 0#entry_point30
   .long 0#entry_point31
-  .long 0#entry_point32
-  .long 0#entry_point33
+  .long entry_point32
+  .long entry_point33
   .long 0#entry_point34
   .long 0#entry_point35
-  .long 0#entry_point36
+  .long entry_point36
   .long 0#entry_point37
   .long 0#entry_point38
-  .long 0#entry_point39
+  .long entry_point39
   .long 0#entry_point40
   .long 0#entry_point41
   .long 0#entry_point42
   .long 0#entry_point43
   .long 0#entry_point44
   .long 0#entry_point45
-  .long 0#entry_point46
+  .long entry_point46
   .long 0#entry_point47
   .long entry_point48
   .long 0#entry_point49

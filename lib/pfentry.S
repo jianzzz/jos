@@ -93,42 +93,37 @@ _pgfault_upcall:
 //	utf_err (error code)
 //	utf_fault_va            <-- %esp
 //
+ 
+    addl $8, %esp  
+    movl %esp,%eax  
+    addl $32,%esp  
+    popl %ebx  
+    addl $4,%esp  
+    movl %esp, %ebp 
+    popl %esp  
+    pushl %ebx  
+    movl %esp, 0x0(%ebp) 
+    movl %eax,%esp  
+    popal  
+    addl $4,%esp  
+    popf  
+    popl %esp  
+    ret
 
-	addl $8, %esp  
-	movl %esp,%eax  
-	addl $32,%esp  
-	popl %ebx  
-	addl $4,%esp  
-	popl %esp  
-	pushl %ebx  
-	movl %eax,%esp  
-	popal  
-	addl $4,%esp  
-	popf  
-	popl %esp  
-	subl $4,%esp  
-	ret  
 
+//  do not use the following, cause I find that 'subl $4,%esp' will change eflags!
 
-//  no need to use the following, cause we leave an extra word first if recursive
-
-//	addl $48, %esp  
-//	popl %eax 
-//	subl $52, %esp  
-//	pushl %eax  
-//	addl $4, %esp 
 //	addl $8, %esp  
-//	movl %esp, %eax  
-//	addl $32, %esp  
+//	movl %esp,%eax  
+//	addl $32,%esp  
 //	popl %ebx  
-//	addl $4, %esp  
+//	addl $4,%esp  
 //	popl %esp  
 //	pushl %ebx  
-//	movl %eax, %esp  
+//	movl %eax,%esp  
 //	popal  
 //	addl $4,%esp  
 //	popf  
-//	subl $52, %esp  
 //	popl %esp  
-//	subl $4, %esp  
-//	ret  
+//	subl $4,%esp  
+//	ret

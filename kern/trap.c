@@ -85,6 +85,10 @@ trap_init(void)
 		else if(i!=9 && i!=15)
 			SETGATE(idt[i],0,GD_KT,entry_points[i],0);  
 	} 
+	for (i = 0; i < 16; ++i){
+	    SETGATE(idt[IRQ_OFFSET+i], 0, GD_KT, entry_points[IRQ_OFFSET+i], 0);
+	}
+
 	SETGATE(idt[T_SYSCALL],0,GD_KT,entry_points[T_SYSCALL],3); 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -229,7 +233,11 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
- 
+ 	case (IRQ_OFFSET + IRQ_TIMER):
+ 		lapic_eoi();
+ 		sched_yield();
+		break;
+
 	default:
 		// Unexpected trap: The user process or the kernel has a bug.
 		print_trapframe(tf);
@@ -361,8 +369,10 @@ page_fault_handler(struct Trapframe *tf)
 			curenv->env_id, fault_va, tf->tf_eip);
 		print_trapframe(tf);
 		env_destroy(curenv);
-	}
-
+	} 
+	// 1. test if page fault upcall valid
+	user_mem_assert(curenv, (void *)curenv->env_pgfault_upcall, 1, 0);
+	
 	//determine user exception stack pointer
 	uint32_t exception_stack_top = 0; 
 	if(tf->tf_esp <= USTACKTOP){
@@ -382,8 +392,8 @@ page_fault_handler(struct Trapframe *tf)
 	}
 
 	//3. test if allocate a page for its exception stack or if can write to it
-	user_mem_assert(curenv, (void *)(UXSTACKTOP-PGSIZE), PGSIZE, PTE_W | PTE_U);//may not return
-
+	user_mem_assert(curenv, (void *) exception_stack_top, 1, PTE_W | PTE_U);//1 is enough, may not return
+	 
 	//write UTrapframe in the stack
 	struct UTrapframe* utf = (struct UTrapframe*)exception_stack_top;
 	utf->utf_fault_va = fault_va;
@@ -392,8 +402,7 @@ page_fault_handler(struct Trapframe *tf)
 	utf->utf_eip = tf->tf_eip;
 	utf->utf_eflags = tf->tf_eflags;
 	utf->utf_esp = tf->tf_esp;
-
-	cprintf("page_fault_handler %x\n",tf->tf_eip);
+ 
 	//branch to curenv->env_pgfault_upcall, that means we should change trapframe's esp and eip
  	tf->tf_esp = (uintptr_t) exception_stack_top;
 	tf->tf_eip = (uintptr_t) curenv->env_pgfault_upcall;

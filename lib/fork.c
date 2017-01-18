@@ -6,6 +6,7 @@
 // PTE_COW marks copy-on-write page table entries.
 // It is one of the bits explicitly allocated to user processes (PTE_AVAIL).
 #define PTE_COW		0x800
+extern void _pgfault_upcall(void);
 
 //
 // Custom page fault handler - if faulting page is copy-on-write,
@@ -46,7 +47,7 @@ pgfault(struct UTrapframe *utf)
 	if ((r = sys_page_alloc(0, PFTEMP, PTE_P|PTE_U|PTE_W)) < 0)
 		panic("allocating at %x in page fault handler: %e", addr, r);
 	memmove(PFTEMP, addr, PGSIZE);
-	//cprintf("in user pgfault,eip = %x\n",utf->utf_eip);
+	//cprintf("in user pgfault,envid = %x\n",thisenv->env_id);
 	if ((r = sys_page_map(0, PFTEMP, 0, addr, PTE_P|PTE_U|PTE_W)) < 0)
 		panic("sys_page_map: %e", r);
 	if ((r = sys_page_unmap(0, PFTEMP)) < 0)
@@ -76,10 +77,10 @@ duppage(envid_t envid, unsigned pn)
 	    (uvpt[pn] & PTE_COW) == PTE_COW){ 
  		if ((r = sys_page_map(0, (void *)addr, envid, (void *)addr, PTE_P|PTE_U|PTE_COW)) < 0){
 			panic("sys_page_map: %e", r);
- 		}
- 		if((uint32_t)addr==USTACKTOP-PGSIZE){
-			cprintf("duppage %x\n",addr);	
- 		}
+ 		} 
+ 		if ((r = sys_page_map(0, (void *)addr, 0, (void *)addr, PTE_P|PTE_U|PTE_COW)) < 0){
+			panic("sys_page_map: %e", r);
+ 		} 
 	}else{
 		if ((r = sys_page_map(0, (void *)addr, envid, (void *)addr, PTE_P|PTE_U)) < 0){
 			panic("sys_page_map: %e", r);
@@ -121,7 +122,21 @@ fork(void)
 		panic("sys_exofork: %e", envid);
 	if (envid == 0) {
 		// We're the child. 
-		set_pgfault_handler(pgfault);
+		// DO NOT CALL set_pgfault_handler DIRECTLY! Cause we are forked from parent who has
+		// called "set_pgfault_handler", so the variable named "_pgfault_handler" in pgfault.c has been set,
+		// and child-env will not call "sys_page_alloc" and "sys_env_set_pgfault_upcall"
+		// do not call: set_pgfault_handler(pgfault); 
+		
+		// DO NOT SET USER EXCEPTION STACK IN CHILD! Cause we set COW on user stack(not user exception stack), so function call
+		// like "sys_page_alloc" and "sys_env_set_pgfault_upcall"(which want to stack user excettion stack) 
+		// will cause page fault, and kern will use user excettion stack, but it has not been set!!
+		// do not call:
+	  	// if (sys_page_alloc(0, (void *)(UXSTACKTOP-PGSIZE), PTE_P|PTE_U|PTE_W) < 0)
+		//	 panic("in fork, sys_page_alloc failed");
+		// if (sys_env_set_pgfault_upcall(0, (void*) _pgfault_upcall) < 0) 
+		// 	 panic("in fork, sys_env_set_pgfault_upcall failed");
+		//  
+
 		thisenv = &envs[ENVX(sys_getenvid())];
 		return 0;
 	}
@@ -130,14 +145,24 @@ fork(void)
 	// map the page copy-on-write into the address space of the child 
 	// and then remap the page copy-on-write in its own address space
 	for (addr = UTEXT; addr < (unsigned)end; addr += PGSIZE){
-		duppage(envid, PGNUM(addr));
-		duppage(0, PGNUM(addr));
+		duppage(envid, PGNUM(addr)); 
 	} 
 	// map the stack we are currently running on.
-	duppage(envid, PGNUM(USTACKTOP - PGSIZE));  
-	cprintf("---------------------- test\n");
-	duppage(0, PGNUM(USTACKTOP - PGSIZE)); 
-  
+	duppage(envid, PGNUM(USTACKTOP - PGSIZE));    
+    // also can:
+  	/*
+	for (addr = 0; addr < USTACKTOP; addr += PGSIZE)
+		if ((uvpd[PDX(addr)] & PTE_P) && (uvpt[PGNUM(addr)] & PTE_P)
+		    && (uvpt[PGNUM(addr)] & PTE_U)) {
+		    duppage(envid, PGNUM(addr)); 
+	}
+	*/
+
+	if (sys_page_alloc(envid, (void *)(UXSTACKTOP-PGSIZE), PTE_P|PTE_U|PTE_W) < 0)
+		panic("in fork, sys_page_alloc failed");
+	if (sys_env_set_pgfault_upcall(envid, (void*) _pgfault_upcall) < 0)
+		panic("in fork, sys_env_set_pgfault_upcall failed");
+
 	// Start the child environment running
 	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
 		panic("sys_env_set_status: %e", r);
@@ -148,7 +173,44 @@ fork(void)
 // Challenge!
 int
 sfork(void)
-{
-	panic("sfork not implemented");
-	return -E_INVAL;
+{ 
+	set_pgfault_handler(pgfault);
+
+	envid_t envid;
+	unsigned addr;
+	int r;
+	extern unsigned char end[]; 
+
+	envid = sys_exofork();
+	if (envid < 0)
+		panic("sys_exofork: %e", envid);
+	if (envid == 0) { 
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+
+	// We're the parent. 
+	// share memory
+	for (addr = UTEXT; addr < (unsigned)end; addr += PGSIZE){
+		// pte's low 12 bits,that means perm,
+		// however, in sys_page_map, no other bits may be set except PTE_SYSCALL
+		// #define PTE_SYSCALL	(PTE_AVAIL | PTE_P | PTE_W | PTE_U)
+		int perm = uvpt[PGNUM(addr)] & PTE_SYSCALL;
+		if ((r = sys_page_map(0, (void *)addr, envid, (void *)addr, perm)) < 0){
+			panic("sys_page_map: %e", r);
+ 		} 
+	} 
+	// map the stack we are currently running on, set copy-on-write.
+	duppage(envid, PGNUM(USTACKTOP - PGSIZE));   
+
+	if (sys_page_alloc(envid, (void *)(UXSTACKTOP-PGSIZE), PTE_P|PTE_U|PTE_W) < 0)
+		panic("in fork, sys_page_alloc failed");
+	if (sys_env_set_pgfault_upcall(envid, (void*) _pgfault_upcall) < 0)
+		panic("in fork, sys_env_set_pgfault_upcall failed");
+
+	// Start the child environment running
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
+		panic("sys_env_set_status: %e", r);
+ 
+	return envid; 
 }

@@ -364,13 +364,12 @@ page_fault_handler(struct Trapframe *tf)
 	}
 
 	//determine user exception stack pointer
-	uint32_t exception_stack_top = 0;
+	uint32_t exception_stack_top = 0; 
 	if(tf->tf_esp <= USTACKTOP){
 		exception_stack_top = UXSTACKTOP - sizeof(struct UTrapframe);
 	}else{
 		//+4 : leave an extra word between the current top of the exception stack
 		exception_stack_top = tf->tf_esp - sizeof(struct UTrapframe) - 4;
-	cprintf("---------------------- %x\n", exception_stack_top);
 	}
 
 	//2. test if the exception stack overflows
@@ -394,6 +393,7 @@ page_fault_handler(struct Trapframe *tf)
 	utf->utf_eflags = tf->tf_eflags;
 	utf->utf_esp = tf->tf_esp;
 
+	cprintf("page_fault_handler %x\n",tf->tf_eip);
 	//branch to curenv->env_pgfault_upcall, that means we should change trapframe's esp and eip
  	tf->tf_esp = (uintptr_t) exception_stack_top;
 	tf->tf_eip = (uintptr_t) curenv->env_pgfault_upcall;

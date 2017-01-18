@@ -82,7 +82,8 @@ i386_init(void)
 	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_LOW);
 	ENV_CREATE(user_dumbfork, ENV_TYPE_USER); 
 	*/
-	ENV_CREATE(user_envpriority, ENV_TYPE_USER);
+	//ENV_CREATE(user_envpriority, ENV_TYPE_USER);
+	ENV_CREATE(user_forktree, ENV_TYPE_USER);
 #endif // TEST*
 	// Schedule and run the first user environment!
 	sched_yield();

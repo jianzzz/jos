@@ -247,7 +247,7 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	
 	if((uint32_t)srcva >= UTOP || (uint32_t)srcva%PGSIZE != 0) return -E_INVAL;
 	if((uint32_t)dstva >= UTOP || (uint32_t)dstva%PGSIZE != 0) return -E_INVAL;
-	
+	 
 	//return the page mapped at virtual address 'va'
 	//pte_store stores the address of the page table entry for this page
 	pte_t *pte_store;

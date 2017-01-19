@@ -32,7 +32,7 @@ pgfault(struct UTrapframe *utf)
 	    (uvpt[PGNUM(addr)] & PTE_P) != PTE_P || 
 	    (uvpt[PGNUM(addr)] & PTE_COW) != PTE_COW){ 
 		//cprintf("(uvpt[PTX(addr)] & PTE_P)=%x,PTE_P=%x\n",(uvpt[PGNUM(addr)] & PTE_P),PTE_P);
-		panic("not copy-on-write");
+		panic("not copy-on-write, addr: %x",addr);
 	}
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new

@@ -4,6 +4,7 @@
 #include <inc/error.h>
 #include <inc/string.h>
 #include <inc/assert.h>
+#include <inc/ipc.h>
 
 #include <kern/env.h>
 #include <kern/pmap.h>
@@ -339,7 +340,41 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_try_send not implemented");
+	// panic("sys_ipc_try_send not implemented");
+	struct Env *e; 
+	int r = envid2env(envid,&e, 0);
+	if(r<0) return r;//-E_BAD_ENV 
+	// target is not blocked, waiting for an IPC.
+	if(!e->env_ipc_recving) return -E_IPC_NOT_RECV;
+	// if receiver asking for one page
+	if ((uint32_t)e->env_ipc_dstva != IPC_NOPAGE && (uint32_t)e->env_ipc_dstva < UTOP) { 
+		// if srcva < UTOP but srcva is not page-aligned.
+		if((uint32_t)srcva >= UTOP || (uint32_t)srcva%PGSIZE != 0) return -E_INVAL;
+		// if srcva < UTOP and perm is inappropriate
+		if((perm & PTE_U) != PTE_U || (perm & PTE_P) != PTE_P) return -E_INVAL;
+		//#define PTE_SYSCALL	(PTE_AVAIL | PTE_P | PTE_W | PTE_U)
+		if ((perm & ~PTE_SYSCALL) != 0) //no other bits may be set
+			return -E_INVAL;
+		// if srcva < UTOP but srcva is not mapped in the caller's address space
+		pte_t *pte_store;
+		struct PageInfo *page = page_lookup(curenv->env_pgdir, srcva, &pte_store);
+		if(page == NULL) return -E_INVAL;//no page mapped at srcva 
+		// if (perm & PTE_W), but srcva is read-only in the current environment's address space
+		if((perm & PTE_W) == PTE_W && (*pte_store & PTE_W) == 0) return -E_INVAL;
+
+		// if there's not enough memory to map srcva in envid's address space
+		// or if e->env_ipc_dstva invalid
+        r = page_insert(e->env_pgdir, page, e->env_ipc_dstva, perm);
+        if (r < 0) return r;// -E_NO_MEM
+        e->env_ipc_perm = perm;
+    }else{
+    	e->env_ipc_perm = 0;
+    } 
+    e->env_ipc_recving = 0;
+    e->env_ipc_from = curenv->env_id;
+    e->env_ipc_value = value;
+    e->env_status = ENV_RUNNABLE;
+    return 0;
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -357,7 +392,17 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
+	//panic("sys_ipc_recv not implemented");
+	// if dstva < UTOP but dstva is not page-aligned.
+	if((uint32_t)dstva == IPC_NOPAGE){
+		curenv->env_ipc_dstva = (void*)IPC_NOPAGE; 
+	}else if((uint32_t)dstva >= UTOP || (uint32_t)dstva%PGSIZE != 0) {
+		return -E_INVAL;
+	}else{
+		curenv->env_ipc_dstva = dstva;
+	}
+	curenv->env_ipc_recving = 1;
+	curenv->env_status = ENV_NOT_RUNNABLE;
 	return 0;
 }
 

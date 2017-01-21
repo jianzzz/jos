@@ -421,12 +421,7 @@ load_icode(struct Env *e, uint8_t *binary)
 void
 env_create(uint8_t *binary, enum EnvType type)
 {
-	// LAB 3: Your code here.
-<<<<<<< HEAD
-
-	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
-	// LAB 5: Your code here.
-=======
+	// LAB 3: Your code here.  
 	struct Env *newEnv;
 	//Allocates a new env 
 	int i = env_alloc(&newEnv,0);
@@ -435,12 +430,14 @@ env_create(uint8_t *binary, enum EnvType type)
 	load_icode(newEnv,binary);
 	//set env_type
 	newEnv->env_type = type;
+	
+	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
+	// LAB 5: Your code here.
 }
  
 void
 env_create_priority(uint8_t *binary, enum EnvType type,enum EnvPriority priority)
-{
-	// LAB 3: Your code here.
+{ 
 	struct Env *newEnv;
 	//Allocates a new env 
 	int i = env_alloc(&newEnv,0);
@@ -450,8 +447,7 @@ env_create_priority(uint8_t *binary, enum EnvType type,enum EnvPriority priority
 	//set env_type
 	newEnv->env_type = type;
 
-	newEnv->priority = priority;
->>>>>>> lab4
+	newEnv->priority = priority; 
 }
 
 //

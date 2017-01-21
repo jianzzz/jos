@@ -162,13 +162,54 @@ cga_init(void)
 }
 
 
+/***** 
+	setcolor function add by zhuangjian, 2016/07/17 
+*****/
+int 
+get_color(const char *color){  
+	if(strcmp(color,"black") == 0) return BLACK;
+	if(strcmp(color,"white") == 0) return WHITE;
+	if(strcmp(color,"red") == 0)   return RED;
+	if(strcmp(color,"green") == 0) return GREEN;
+	if(strcmp(color,"blue") == 0)  return BLUE;
+	return -1;
+}
+
+int 
+get_bg_ch_color(const char *bg, const char *ch){
+	int b = get_color(bg);
+	int c = get_color(ch);  
+	if(b == -1 && c == -1) return 0x7000;
+	return ((b << 12) | (c << 8)) & 0xff00; 
+}
+
+static int bg_ch_color;
+void
+setcolor(const char *bg, const char *ch){
+	bg_ch_color = get_bg_ch_color(bg,ch);	
+	int i;	 
+	for(i=0;i<CRT_SIZE;i++){
+		crt_buf[i] = (crt_buf[i] & 0xff) | bg_ch_color;
+	}	
+}
+
+int 
+get_default_color(){	
+	if(bg_ch_color == 0) return 0x0700;
+	return bg_ch_color;
+}
+
+
+
+
 
 static void
 cga_putc(int c)
 {
 	// if no attribute given, then use black on white
 	if (!(c & ~0xFF))
-		c |= 0x0700;
+		//c |= 0x0700;
+		c |= get_default_color();
 
 	switch (c & 0xff) {
 	case '\b':
@@ -201,7 +242,8 @@ cga_putc(int c)
 
 		memmove(crt_buf, crt_buf + CRT_COLS, (CRT_SIZE - CRT_COLS) * sizeof(uint16_t));
 		for (i = CRT_SIZE - CRT_COLS; i < CRT_SIZE; i++)
-			crt_buf[i] = 0x0700 | ' ';
+			//crt_buf[i] = 0x0700 | ' ';
+			crt_buf[i] = get_default_color() | ' ';
 		crt_pos -= CRT_COLS;
 	}
 

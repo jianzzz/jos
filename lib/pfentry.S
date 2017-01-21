@@ -80,3 +80,50 @@ _pgfault_upcall:
 
 	// Return to re-execute the instruction that faulted.
 	// LAB 4: Your code here.
+
+// exception stack:
+//
+//	trap-time esp
+//	trap-time eflags
+//	trap-time eip
+//	utf_regs.reg_eax
+//	...
+//	utf_regs.reg_esi
+//	utf_regs.reg_edi
+//	utf_err (error code)
+//	utf_fault_va            <-- %esp
+//
+ 
+    addl $8, %esp  
+    movl %esp,%eax  
+    addl $32,%esp  
+    popl %ebx  
+    addl $4,%esp  
+    movl %esp, %ebp 
+    popl %esp  
+    pushl %ebx  
+    movl %esp, 0x0(%ebp) 
+    movl %eax,%esp  
+    popal  
+    addl $4,%esp  
+    popf  
+    popl %esp  
+    ret
+
+
+//  do not use the following, cause I find that 'subl $4,%esp' will change eflags!
+
+//	addl $8, %esp  
+//	movl %esp,%eax  
+//	addl $32,%esp  
+//	popl %ebx  
+//	addl $4,%esp  
+//	popl %esp  
+//	pushl %ebx  
+//	movl %eax,%esp  
+//	popal  
+//	addl $4,%esp  
+//	popf  
+//	popl %esp  
+//	subl $4,%esp  
+//	ret

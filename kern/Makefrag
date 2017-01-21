@@ -76,6 +76,7 @@ KERN_BINFILES +=	user/idle \
 			user/pingpong \
 			user/pingpongs \
 			user/primes
+ 
 # Binary files for LAB5
 KERN_BINFILES +=	user/testfile \
 			user/spawnhello \
@@ -91,7 +92,10 @@ KERN_BINFILES +=	user/testpteshare \
 			user/primespipe \
 			user/testkbd \
 			user/testshell
-
+ 
+# Binary files for LAB4, add by jianzzz
+KERN_BINFILES +=	user/envpriority 
+ 
 KERN_OBJFILES := $(patsubst %.c, $(OBJDIR)/%.o, $(KERN_SRCFILES))
 KERN_OBJFILES := $(patsubst %.S, $(OBJDIR)/%.o, $(KERN_OBJFILES))
 KERN_OBJFILES := $(patsubst $(OBJDIR)/lib/%, $(OBJDIR)/kern/%, $(KERN_OBJFILES))

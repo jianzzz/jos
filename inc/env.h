@@ -44,8 +44,18 @@ enum EnvType {
 	ENV_TYPE_FS,		// File system server
 };
 
+enum EnvPriority {
+	ENV_PRIORITY_HIGH = 0,
+	ENV_PRIORITY_1,
+	ENV_PRIORITY_2,
+	ENV_PRIORITY_3,
+	ENV_PRIORITY_4,
+	ENV_PRIORITY_5,
+	ENV_PRIORITY_LOW 
+};
+
 struct Env {
-	struct Trapframe env_tf;	// Saved registers
+	struct Trapframe env_tf;	// Saved registers ,see in inc/trap.h
 	struct Env *env_link;		// Next free Env
 	envid_t env_id;			// Unique environment identifier
 	envid_t env_parent_id;		// env_id of this env's parent
@@ -66,6 +76,8 @@ struct Env {
 	uint32_t env_ipc_value;		// Data value sent to us
 	envid_t env_ipc_from;		// envid of the sender
 	int env_ipc_perm;		// Perm of page mapping received
+
+	enum EnvPriority priority;
 };
 
 #endif // !JOS_INC_ENV_H

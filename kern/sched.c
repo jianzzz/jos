@@ -12,7 +12,7 @@ void
 sched_yield(void)
 {
 	struct Env *idle;
-
+		 
 	// Implement simple round-robin scheduling.
 	//
 	// Search through 'envs' for an ENV_RUNNABLE environment in
@@ -27,8 +27,43 @@ sched_yield(void)
 	// another CPU (env_status == ENV_RUNNING). If there are
 	// no runnable environments, simply drop through to the code
 	// below to halt the cpu.
-
-	// LAB 4: Your code here.
+	// LAB 4: Your code here. 
+	// no priority
+	/*
+	int i;
+	int current_env_idx = curenv ? ENVX(curenv->env_id) : 0;
+	int idx = curenv ? (current_env_idx + 1) % NENV : 0; // start by looking at the next process
+ 
+	for (i = 0; i < NENV; i++) {
+		if (envs[idx].env_status == ENV_RUNNABLE){
+			env_run(&envs[idx]);
+		}
+		idx = (idx + 1) % NENV;
+	} 
+	if (curenv != NULL && curenv->env_status == ENV_RUNNING){ 
+		env_run(curenv);
+	}
+  	*/
+  	// use priority, lab4 challenge
+	enum EnvPriority priority;
+	int i = 0;;
+	int current_env_idx = curenv ? ENVX(curenv->env_id) : 0;
+	int idx = curenv ? (current_env_idx + 1) % NENV : 0; // start by looking at the next process
+ 	for (priority = ENV_PRIORITY_HIGH; priority <= ENV_PRIORITY_LOW; priority++) { 
+		for (i = 0; i < NENV; i++) {
+			if (envs[idx].env_status == ENV_RUNNABLE && envs[idx].priority == priority){ 
+				if (curenv != NULL && curenv->env_status == ENV_RUNNING && curenv->priority < envs[idx].priority){ 
+					env_run(curenv);
+				}else{
+					env_run(&envs[idx]);
+				}
+			}
+			idx = (idx + 1) % NENV;
+		} 
+ 	}
+	if (curenv != NULL && curenv->env_status == ENV_RUNNING){ 
+		env_run(curenv);
+	}
 
 	// sched_halt never returns
 	sched_halt();

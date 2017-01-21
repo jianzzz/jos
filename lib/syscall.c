@@ -3,6 +3,7 @@
 #include <inc/syscall.h>
 #include <inc/lib.h>
 
+//用户代码通过该接口进行系统调用
 static inline int32_t
 syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
 {
@@ -117,3 +118,14 @@ sys_ipc_recv(void *dstva)
 	return syscall(SYS_ipc_recv, 1, (uint32_t)dstva, 0, 0, 0, 0);
 }
 
+int
+sys_env_set_priority(envid_t envid, uint32_t priority)
+{
+	return syscall(SYS_env_set_priority, 1, envid, priority, 0, 0, 0);
+}
+
+uint32_t
+sys_env_get_priority(void)
+{
+	 return syscall(SYS_env_get_priority, 0, 0, 0, 0, 0, 0);
+}

@@ -21,28 +21,40 @@ static void boot_aps(void);
 void
 i386_init(void)
 {
+	//see kernel.ld !!!
 	extern char edata[], end[];
 
 	// Before doing anything else, complete the ELF loading process.
 	// Clear the uninitialized global data (BSS) section of our program.
 	// This ensures that all static/global variables start out zero.
+	
+	/* 
+	可以看到两个外部字符数组变量 edata 和 end，其中 edata 表示的是 bss 节起始位置（虚拟地址）,
+    而 end 则是表示内核可执行程序结束位置（虚拟地址）。由 2.1 节中对 ELF
+	文件的讲解我们可以知道 bss 节是文件在内存中的最后一部分，于是 edata 与 end 之间的部
+	分便是 bss 节的部分，我们又知道 bss 节的内容是未初始化的变量，而这些变量是默认为零
+	的，所以在一开始的时候程序要用 memset(edata, 0, end - edata)这句代码将这些变量都置为
+	零。
+	*/
+
 	memset(edata, 0, end - edata);
 
 	// Initialize the console.
 	// Can't call cprintf until after we do this!
 	cons_init();
-
+ 
 	cprintf("6828 decimal is %o octal!\n", 6828);
 
 	// Lab 2 memory management initialization functions
 	mem_init();
 
+ 
 	// Lab 3 user environment initialization functions
 	env_init();
 	trap_init();
 
 	// Lab 4 multiprocessor initialization functions
-	mp_init();
+	mp_init();//see in mpconfig.c
 	lapic_init();
 
 	// Lab 4 multitasking initialization functions
@@ -50,9 +62,9 @@ i386_init(void)
 
 	// Acquire the big kernel lock before waking up APs
 	// Your code here:
-
+	lock_kernel();
 	// Starting non-boot CPUs
-	boot_aps();
+	boot_aps(); 
 
 	// Start fs.
 	ENV_CREATE(fs_fs, ENV_TYPE_FS);
@@ -60,14 +72,27 @@ i386_init(void)
 #if defined(TEST)
 	// Don't touch -- used by grading script!
 	ENV_CREATE(TEST, ENV_TYPE_USER);
+<<<<<<< HEAD
 #else
-	// Touch all you want.
+	// Touch all you want.  
+	//ENV_CREATE(user_primes, ENV_TYPE_USER);
+	/* 
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_HIGH);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_1);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_2);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_3);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_4);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_5);
+	ENV_CREATE_PRIORITY(user_yield, ENV_TYPE_USER, ENV_PRIORITY_LOW);
+	ENV_CREATE(user_dumbfork, ENV_TYPE_USER); 
+	*/
+	//ENV_CREATE(user_envpriority, ENV_TYPE_USER); 
 	ENV_CREATE(user_icode, ENV_TYPE_USER);
 #endif // TEST*
 
 	// Should not be necessary - drains keyboard because interrupt has given up.
 	kbd_intr();
-
+ 
 	// Schedule and run the first user environment!
 	sched_yield();
 }
@@ -86,22 +111,24 @@ boot_aps(void)
 	struct CpuInfo *c;
 
 	// Write entry code to unused memory at MPENTRY_PADDR
-	code = KADDR(MPENTRY_PADDR);
+	code = KADDR(MPENTRY_PADDR); //0x7000
 	memmove(code, mpentry_start, mpentry_end - mpentry_start);
 
 	// Boot each AP one at a time
 	for (c = cpus; c < cpus + ncpu; c++) {
+		//cpunum() see in lapic.c
 		if (c == cpus + cpunum())  // We've started already.
 			continue;
 
 		// Tell mpentry.S what stack to use 
-		mpentry_kstack = percpu_kstacks[c - cpus] + KSTKSIZE;
+		mpentry_kstack = percpu_kstacks[c - cpus] + KSTKSIZE; //used in mpentry.S
 		// Start the CPU at mpentry_start
-		lapic_startap(c->cpu_id, PADDR(code));
+		//cprintf("c->cpu_id=%d\n", c->cpu_id);
+		lapic_startap(c->cpu_id, PADDR(code));// cpus has been initialized in mpconfig.c/mp_init()
 		// Wait for the CPU to finish some basic setup in mp_main()
 		while(c->cpu_status != CPU_STARTED)
 			;
-	}
+	}  
 }
 
 // Setup code for APs
@@ -121,10 +148,11 @@ mp_main(void)
 	// to start running processes on this CPU.  But make sure that
 	// only one CPU can enter the scheduler at a time!
 	//
-	// Your code here:
-
+	// Your code here: 
+	lock_kernel();
+	sched_yield(); 
 	// Remove this after you finish Exercise 4
-	for (;;);
+	//for (;;);
 }
 
 /*

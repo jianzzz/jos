@@ -7,6 +7,7 @@ check_page_alloc() succeeded!
 check_page() succeeded!
 check_kern_pgdir() succeeded!
 check_page_installed_pgdir() succeeded!
+ 
 SMP: CPU 0 found 1 CPU(s)
 enabled interrupts: 1 2 4
 FS is running
@@ -33,4 +34,4 @@ TRAP frame at 0xf0279080 from CPU 0
   flag 0x00000292
   esp  0xeebfdf68
   ss   0x----0023
-K> qemu: terminating on signal 15 from pid 19461
+K> qemu: terminating on signal 15 from pid 19461 

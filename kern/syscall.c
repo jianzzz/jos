@@ -358,17 +358,11 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 	if(r<0) return r;//-E_BAD_ENV 
 	// target is not blocked, waiting for an IPC.
 	if(!e->env_ipc_recving) return -E_IPC_NOT_RECV;
-	// if receiver asking for one page
-<<<<<<< HEAD
-	if ((uint32_t)e->env_ipc_dstva != IPC_NOPAGE && (uint32_t)e->env_ipc_dstva < UTOP) { 
-		// if srcva < UTOP but srcva is not page-aligned. 
-		if((uint32_t)srcva >= UTOP || (uint32_t)srcva%PGSIZE != 0) return -E_INVAL;
-=======
+	// if receiver asking for one page 
 	if ((uint32_t)e->env_ipc_dstva != IPC_NOPAGE && (uint32_t)e->env_ipc_dstva < UTOP 
 		&& (uint32_t)srcva < UTOP) { 
 		// if srcva < UTOP but srcva is not page-aligned. 
-		if((uint32_t)srcva%PGSIZE != 0) return -E_INVAL;
->>>>>>> lab4
+		if((uint32_t)srcva%PGSIZE != 0) return -E_INVAL; 
 		// if srcva < UTOP and perm is inappropriate
 		if((perm & PTE_U) != PTE_U || (perm & PTE_P) != PTE_P) return -E_INVAL;
 		//#define PTE_SYSCALL	(PTE_AVAIL | PTE_P | PTE_W | PTE_U)

@@ -73,7 +73,10 @@ duppage(envid_t envid, unsigned pn)
 	// LAB 4: Your code here.
 	//panic("duppage not implemented"); 
 	void *addr = (void *)(pn*PGSIZE);
-	if( (uvpt[pn] & PTE_W) == PTE_W || 
+	if ( (uvpt[pn] & PTE_SHARE) == PTE_SHARE ) { 
+		if ((r = sys_page_map(0, (void *)addr, envid, (void *)addr, uvpt[pn] & PTE_SYSCALL)) < 0)
+			panic("sys_page_map: %e\n", r);
+	} else if( (uvpt[pn] & PTE_W) == PTE_W || 
 	    (uvpt[pn] & PTE_COW) == PTE_COW){ 
  		if ((r = sys_page_map(0, (void *)addr, envid, (void *)addr, PTE_P|PTE_U|PTE_COW)) < 0){
 			panic("sys_page_map: %e", r);
@@ -144,19 +147,22 @@ fork(void)
 	// We're the parent. 
 	// map the page copy-on-write into the address space of the child 
 	// and then remap the page copy-on-write in its own address space
+	for (addr = 0; addr < USTACKTOP; addr += PGSIZE)
+		if ((uvpd[PDX(addr)] & PTE_P) && (uvpt[PGNUM(addr)] & PTE_P)
+		    && (uvpt[PGNUM(addr)] & PTE_U)) {
+		    duppage(envid, PGNUM(addr)); 
+		} 
+	// fix lab4!!! can not use the following!!!
+	// we may use some addr above end[] but below USTACKTOP in parent, even make it a shared-page,
+	// if we use the following, child will not map the addr and child may cause page fault when use it,
+	// however, it's not a copy-on-write addr at all, it will panic in pgfault
+	/*
 	for (addr = UTEXT; addr < (unsigned)end; addr += PGSIZE){
 		duppage(envid, PGNUM(addr)); 
 	} 
 	// map the stack we are currently running on.
 	duppage(envid, PGNUM(USTACKTOP - PGSIZE));    
-    // also can:
-  	/*
-	for (addr = 0; addr < USTACKTOP; addr += PGSIZE)
-		if ((uvpd[PDX(addr)] & PTE_P) && (uvpt[PGNUM(addr)] & PTE_P)
-		    && (uvpt[PGNUM(addr)] & PTE_U)) {
-		    duppage(envid, PGNUM(addr)); 
-	}
-	*/
+    */
 
 	if (sys_page_alloc(envid, (void *)(UXSTACKTOP-PGSIZE), PTE_P|PTE_U|PTE_W) < 0)
 		panic("in fork, sys_page_alloc failed");
@@ -191,6 +197,26 @@ sfork(void)
 
 	// We're the parent. 
 	// share memory
+	for (addr = 0; addr < USTACKTOP; addr += PGSIZE){
+		// pte's low 12 bits,that means perm,
+		// however, in sys_page_map, no other bits may be set except PTE_SYSCALL
+		// #define PTE_SYSCALL	(PTE_AVAIL | PTE_P | PTE_W | PTE_U)
+		if ((uvpd[PDX(addr)] & PTE_P) && (uvpt[PGNUM(addr)] & PTE_P)
+		    && (uvpt[PGNUM(addr)] & PTE_U)){
+			int perm = uvpt[PGNUM(addr)] & PTE_SYSCALL;
+			if ((r = sys_page_map(0, (void *)addr, envid, (void *)addr, perm)) < 0){
+				panic("sys_page_map: %e", r);
+	 		} 
+		}
+	} 
+	// map the stack we are currently running on, set copy-on-write.
+	duppage(envid, PGNUM(USTACKTOP - PGSIZE));  
+
+	// fix lab4!!! can not use the following!!!
+	// we may use some addr above end[] but below USTACKTOP in parent, even make it a shared-page,
+	// if we use the following, child will not map the addr and child may cause page fault when use it,
+	// however, it's not a copy-on-write addr at all, it will panic in pgfault
+	/*
 	for (addr = UTEXT; addr < (unsigned)end; addr += PGSIZE){
 		// pte's low 12 bits,that means perm,
 		// however, in sys_page_map, no other bits may be set except PTE_SYSCALL
@@ -202,6 +228,7 @@ sfork(void)
 	} 
 	// map the stack we are currently running on, set copy-on-write.
 	duppage(envid, PGNUM(USTACKTOP - PGSIZE));   
+	*/
 
 	if (sys_page_alloc(envid, (void *)(UXSTACKTOP-PGSIZE), PTE_P|PTE_U|PTE_W) < 0)
 		panic("in fork, sys_page_alloc failed");

@@ -140,7 +140,21 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
 	// LAB 5: Your code here.
 	// Remember to check whether the user has supplied us with a good
 	// address!
-	panic("sys_env_set_trapframe not implemented");
+	// panic("sys_env_set_trapframe not implemented");
+
+	struct Env *e; 
+	// check whether the current environment has permission to set envid's trapframe. 
+	// i.e.,the specified environment must be either the
+	// current environment or an immediate child of the current environment.
+	int r = envid2env(envid,&e,true);
+	if(r<0) return r;//-E_BAD_ENV 
+	// check whether the user has supplied us with a good address!
+	user_mem_assert(e, tf, sizeof(struct Trapframe), PTE_U | PTE_W);//see in kern/pmap.c
+	e->env_tf = *tf;
+	// Enable interrupts while in user mode. 
+	e->env_tf.tf_cs = GD_UT | 3;
+	e->env_tf.tf_eflags |= FL_IF;
+	return 0;
 }
 
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
@@ -502,6 +516,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	}
 	case SYS_env_get_priority:{ 
 		return sys_env_get_priority(); 
+	}
+	case SYS_env_set_trapframe:{
+		return sys_env_set_trapframe((envid_t)a1,(struct Trapframe *)a2); 
 	}
 	case NSYSCALLS:
 	default:

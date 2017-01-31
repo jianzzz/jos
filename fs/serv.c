@@ -70,10 +70,12 @@ openfile_alloc(struct OpenFile **o)
 	for (i = 0; i < MAXOPEN; i++) {
 		switch (pageref(opentab[i].o_fd)) {
 		case 0:
+			//cprintf("i=%d,ref=%d\n",i,pageref(opentab[i].o_fd));
 			if ((r = sys_page_alloc(0, opentab[i].o_fd, PTE_P|PTE_U|PTE_W)) < 0)
 				return r;
 			/* fall through */
 		case 1:
+			//cprintf("i=%d,ref=%d\n",i,pageref(opentab[i].o_fd));
 			opentab[i].o_fileid += MAXOPEN;
 			*o = &opentab[i];
 			memset(opentab[i].o_fd, 0, PGSIZE);
